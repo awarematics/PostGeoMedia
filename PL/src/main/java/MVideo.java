@@ -143,7 +143,7 @@ public class MVideo extends MGeometry {
 	public String toGeoString() {
 		String mphotoString = "MVIDEO (" + uri + ", " + mt.toGeoString() + ", FRAME (";
 		for (int i = 0; i < numOf(); i++) {
-			// System.out.println( frame[i].fov.toGeoString());
+			 System.out.println( frame[i].fov.toGeoString());
 			if (i == 0)
 				mphotoString += frame[i].fov.toGeoString();
 			else

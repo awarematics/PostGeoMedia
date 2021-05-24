@@ -28,7 +28,9 @@ public class MLCVS {
 		for (int j = 0; j <= mv2.numOf(); j++) {
 			c[0][j] = 0;
 		}
-		
+
+		//FoV[] fov1 = mv1.getFov();
+		//FoV[] fov2 = mv2.getFov();
 		for (int i = 1; i <= mv1.numOf(); i++) {
 			for (int j = 1; j <= mv2.numOf(); j++) {
 				if (Math.abs(j - i) <= delta) {
@@ -59,10 +61,11 @@ public class MLCVS {
 
 	private Polygon genFoVArea(double x, double y, FoV fov, int unitAngle) {
 		int times = 1;
+
 		GeometryFactory geometryFactory = new GeometryFactory();
 		Coordinate[] coor1 = new Coordinate[(int) (fov.getHorizontalAngle()) / unitAngle + 2];
 		coor1[0] = new Coordinate(x, y);
-		
+
 		for (int i = 0; i < (int) (fov.getHorizontalAngle()) / unitAngle; i++) {
 			double x_temp = x + fov.getDistance()
 					* Math.sin(Math.toRadians(fov.getDirection2d() - (fov.getHorizontalAngle()) / 2 + unitAngle * i)) * times;
