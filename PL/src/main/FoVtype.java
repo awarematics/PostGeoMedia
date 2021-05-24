@@ -6,7 +6,7 @@ import java.sql.SQLInput;
 import java.sql.SQLOutput;
 
 
-public class FoV implements SQLData {
+public class FoVtype implements SQLData {
 	   private 	double horizontalAngle;
 	   private	double verticalAngle;
 	   private	double distance;

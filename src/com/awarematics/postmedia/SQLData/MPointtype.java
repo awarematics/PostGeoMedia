@@ -7,7 +7,7 @@ import java.sql.SQLInput;
 import java.sql.SQLOutput;
 
 
-public class MPoint implements SQLData {
+public class MPointtype implements SQLData {
 	   private 	Array coords;
 	   private	Array times;
 	   private String m_typeName;

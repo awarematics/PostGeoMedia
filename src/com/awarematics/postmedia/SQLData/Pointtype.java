@@ -6,7 +6,7 @@ import java.sql.SQLInput;
 import java.sql.SQLOutput;
 
 
-public class Point implements SQLData {
+public class Pointtype implements SQLData {
 	   private double m_x;
 	   private double m_y;
 	   private String m_typeName;
