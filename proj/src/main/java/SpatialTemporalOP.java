@@ -18,6 +18,10 @@ import com.awarematics.postmedia.types.mediamodel.MDouble;
 import com.awarematics.postmedia.types.mediamodel.MGeometry;
 import com.awarematics.postmedia.types.mediamodel.MPoint;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+
 import org.postgresql.pljava.annotation.Function;
 
 import com.awarematics.postmedia.types.mediamodel.MVideo;
@@ -56,6 +60,17 @@ public class SpatialTemporalOP {
 			return mg1.startTime();
 		}
 
+	 
+	 @Function
+	 public static String useComplexTest(ResultSet mpoint)
+			 throws SQLException
+			 {
+			   long base = mpoint.getLong(1);
+			   String incbase = mpoint.getString(2);
+			   return "Base = \"" + base +
+			     "\", incbase = \"" + incbase + "\"";
+			 }	 
+	 
 	
 	@Function
 	public static boolean M_tIntersects(String mgstring, String periodstring)
