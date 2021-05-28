@@ -1,7 +1,5 @@
 
 ----drop tables
 
-  drop table IF EXISTS taxi;
-  drop table IF EXISTS cars;
-  drop table IF EXISTS trips;
+  drop table IF EXISTS car;
   drop table mgeometry_columns;

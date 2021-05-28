@@ -1,72 +1,32 @@
-select * from mgeometry_columns;
-
-CREATE OR REPLACE FUNCTION public.append(
-    mdouble,
-    double precision [], timestamp without time zone [])
-  RETURNS mdouble AS
-$BODY$
-DECLARE
-    f_mgeometry            	alias for $1;
-    tp                		alias for $2; 
- 	timeline                alias for $3;
-    f_mgeometry_segtable_name    char(200);
-    mpid                	integer;
-	segid                	integer;
-    sql               		text;
-	annotations				json;
-	trajid				integer;
-	mgeometry_types		char(50);
-	mgeometry_inter		char(50);
-BEGIN	
-	mgeometry_types := 'mdouble';
-	mgeometry_inter := 'linear' ;
-    sql := 'select f_segtableoid  from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid   );
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-    mpid := f_mgeometry.moid;
-   	sql := 'select segid from ' || quote_ident(f_mgeometry_segtable_name) ||
-                ' where mpid = ' || f_mgeometry.moid;
-        RAISE DEBUG '%', sql;
-        EXECUTE sql INTO segid;		
----array_cat(anyarray, anyarray)
-	IF( segid IS NOT NULL) THEN
-	 EXECUTE 'UPDATE ' || quote_ident(f_mgeometry_segtable_name) || 
-                ' set datetimes = array_cat(datetimes, $2) , values = array_cat(values, $3) 
-                where mpid = $4 and segid = $5 '
-            USING tp, timeline, tp, mpid, segid; 
-	sql := 'select row_to_json((SELECT d from (select datetimes, values, type, interpolation) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   		    RAISE DEBUG '%', sql;
-			EXECUTE sql INTO annotations;
+/*
+---mpoint
+ 			mpid        integer,
+            segid       integer,
+			mbr			geometry,
+			timerange		int8range,
+            datetimes    	bigint[],
+            geo        point[]
 			
-    EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING   mpid, tp, timeline,annotations;
-	
-	ELSE
-    EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) || '(mpid,segid,  datetimes, values, type, interpolation) 
-	VALUES($1, 1, $3, $2, $4, $5)'
-    USING mpid, tp, timeline, mgeometry_types, mgeometry_inter;
-		
-	sql := 'select row_to_json((SELECT d from (select datetimes,values, type,  interpolation) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   		RAISE DEBUG '%', sql;
-   	 	EXECUTE sql INTO annotations;		
-	EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING  mpid, tp, timeline, annotations;
-	END IF;
-    return f_mgeometry;
-END;
-$BODY$
-  LANGUAGE plpgsql VOLATILE STRICT
-  COST 100;
-ALTER FUNCTION public.append(mdouble, double precision [], timestamp without time zone [])
-  OWNER TO postgres;
-  
-  
+---mvideo
+ 			mpid        integer,
+            segid        integer,
+			mbr			geometry,
+			timerange		int8range,
+			fovs			fov[],
+			horizontalAngle double precision[],
+			verticalAngle double precision[],
+			direction2d double precision[],
+			direction3d double precision[],
+			distance double precision[],
+			uri			character varying[],
+            datetimes    	bigint[],
+            geo        point[]
+*/
 CREATE OR REPLACE FUNCTION public.append(
-	mpoint,
-	mcoordinate[],
-	timestamp without time zone[])
-    RETURNS mpoint
+	mgeometry,
+	point,
+	bigint)
+    RETURNS mgeometry
 AS $BODY$
 DECLARE
     f_mgeometry            	alias for $1;
@@ -76,280 +36,145 @@ DECLARE
     f_mgeometry_segtable_name    char(200);
     mpid               		integer;
     sql                		text;
-	annotations				json;
-	trajid					integer;
-	mgeometry_types			char(50);
-	mgeometry_inter			char(50);
+	new_segid				integer;
+	traj_prefix				text;
+	cnt_mpid				integer;
+	max_tpseg_count			integer;
+	tp_seg_size					integer;
 BEGIN   
-	mgeometry_types := 'mpoint';
-	mgeometry_inter := 'linear' ;
-	sql := 'select f_segtableoid  from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid   );
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-    mpid := f_mgeometry.moid;
-	   	sql := 'select segid from ' || quote_ident(f_mgeometry_segtable_name) ||
-                ' where mpid = ' || f_mgeometry.moid;
-        RAISE DEBUG '%', sql;
-        EXECUTE sql INTO segid;	
-	IF( segid IS NOT NULL) THEN
-	 EXECUTE 'UPDATE ' || quote_ident(f_mgeometry_segtable_name) || 
-                ' set datetimes = array_cat(datetimes, $2) , geo = array_cat(geo, $3) 
-                where mpid = $4 and segid = $5 '
-            USING tp, timeline, tp, mpid, segid; 
-	sql := 'select row_to_json((SELECT d from (select datetimes,geo, type, interpolation) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   		    RAISE DEBUG '%', sql;
-			EXECUTE sql INTO annotations;
-			
-    EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING   mpid, tp, timeline,annotations;
-	
-	ELSE
-    EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) || '(mpid, segid, datetimes, geo, type, interpolation) 
-    VALUES($1, 1, $3, $2, $4, $5)'
-    USING mpid, tp, timeline, mgeometry_types, mgeometry_inter;
-	--get json ;
-	sql := 'select row_to_json((SELECT d from (select datetimes,geo, type, interpolation ) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   	RAISE DEBUG '%', sql;
-    EXECUTE sql INTO annotations;		
-	EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING  mpid, tp, timeline, annotations;   
+	traj_prefix := 'mpoint_' ;		
+	f_mgeometry_segtable_name := traj_prefix || f_mgeometry.segid ;
+	mpid := f_mgeometry.moid;
+	----count number of points
+	sql := 'SELECT COUNT(*) FROM ' || quote_ident(f_mgeometry_segtable_name) || 
+		' WHERE mpid = ' || f_mgeometry.moid;
+	RAISE DEBUG '%', sql;
+	EXECUTE sql INTO cnt_mpid;
+	----for indexing seg_table 
+	sql := 'select tpseg_size from mgeometry_columns where f_mgeometry_segtable_name  = ' || quote_literal(f_mgeometry_segtable_name);
+	RAISE DEBUG '%', sql;
+	EXECUTE sql INTO tp_seg_size;	
+	IF (cnt_mpid < 1) THEN
+		---mpid, segid, mbr, datetimes, geo
+		EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) || '(mpid, segid, mbr, datetimes, geo) 
+			VALUES($1, 1, st_geomfromtext(st_astext(st_makebox2d($3::geometry, $3::geometry))), ARRAY[$2]::bigint[], ARRAY[$3]::Point[])'
+		USING mpid, timeline, tp;
 	END IF;
-    return f_mgeometry;
+    ----have points in mpoint
+	IF(cnt_mpid > 0) THEN
+		sql := 'select max(segid) from ' || quote_ident(f_mgeometry_segtable_name) ||
+				' where mpid = ' || f_mgeometry.moid;
+		EXECUTE sql INTO segid;
+		sql := 'select array_upper((select geo from ' || quote_ident(f_mgeometry_segtable_name) || 
+			' where mpid = ' || f_mgeometry.moid || ' and segid = ' || segid || '), 1)';
+		RAISE DEBUG '%', sql;
+		EXECUTE sql INTO max_tpseg_count;
+		----add array points and times	
+		IF( segid IS NOT NULL AND max_tpseg_count < tp_seg_size) THEN
+			EXECUTE 'UPDATE ' || quote_ident(f_mgeometry_segtable_name) || 
+				' set datetimes = array_append(datetimes, $1), mbr = st_geomfromtext(st_astext(st_combinebbox( Box2D(mbr), $2::geometry))), geo = array_append(geo, $2)
+				where mpid = $3 and segid = $4'
+			USING timeline, tp, mpid, segid;
+		ELSE 
+			---split segment mpoint
+			new_segid := segid+1;
+			EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) ||'(mpid, segid, mbr, datetimes, geo) 
+				VALUES( $1, $2, st_geomfromtext(st_astext(st_makebox2d($3::geometry, $3::geometry))), ARRAY[$4]::bigint[], ARRAY[$5]::Point[])'
+			USING f_mgeometry.moid, new_segid, tp, timeline, tp;
+				
+		END IF;
+	END IF;
+	RETURN f_mgeometry;
 END;
 $BODY$
   LANGUAGE plpgsql VOLATILE STRICT
   COST 100;
-ALTER FUNCTION public.append(mpoint, mcoordinate[], timestamp without time zone[])
+ALTER FUNCTION public.append(mgeometry, point, bigint)
     OWNER TO postgres;
-  
-
-
-
-
-  
-CREATE OR REPLACE FUNCTION public.append(
-    mvideo,
-    mcoordinate[], timestamp without time zone[], character varying[], double precision[], double precision[], double precision[], fov[])
-  RETURNS mvideo AS
-$BODY$
+    
+    
+    
+    
+    
+    
+CREATE OR REPLACE FUNCTION public.append(mgeometry, point, bigint, double precision, double precision, double precision, double precision, double precision, character varying)
+    RETURNS mgeometry
+AS $BODY$
 DECLARE
-    f_mgeometry           	alias for $1;
-    tp						alias for $2;
-	timeline					alias for $3;	
-	turi					alias for $4;	
-	tdistance				alias for $5;	
-	tdirection				alias for $6;
-	tangle					alias for $7;
-	tfov					alias for $8;
+    f_mgeometry            	alias for $1;
+    tp                		alias for $2;
+ 	timeline                alias for $3;
+	vangle                alias for $4;
+	hangle                alias for $5;
+	dir2d                alias for $6;
+	dir3d                alias for $7;
+	dist                alias for $8;
+	uris                alias for $9;
 	segid                	integer;
     f_mgeometry_segtable_name    char(200);
-    mpid                	integer;
+    mpid               		integer;
     sql                		text;
-	trajid					integer;
-	annotations				json;
-	mgeometry_types		char(50);
+	new_segid				integer;
+	traj_prefix				text;
+	cnt_mpid				integer;
+	max_tpseg_count			integer;
+	tp_seg_size					integer;
 BEGIN   
-	mgeometry_types := 'mvideo';
-	sql := 'select f_segtableoid  from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid   );
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-    mpid := f_mgeometry.moid;
-	   	sql := 'select segid from ' || quote_ident(f_mgeometry_segtable_name) ||
-                ' where mpid = ' || f_mgeometry.moid;
-        RAISE DEBUG '%', sql;
-        EXECUTE sql INTO segid;	
-	IF( segid IS NOT NULL) THEN
-	 EXECUTE 'UPDATE ' || quote_ident(f_mgeometry_segtable_name) || 
-                ' set datetimes = array_cat(datetimes, $2) , geo = array_cat(geo, $3) 
-                where mpid = $4 and segid = $5 '
-            USING tp, timeline, tp, mpid, segid; 
-	sql := 'select row_to_json((SELECT d from (select datetimes,geo,uri,fovs ) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   		    RAISE DEBUG '%', sql;
-			EXECUTE sql INTO annotations;
-			
-    EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING   mpid, tp, timeline,annotations;
-	
-	ELSE
-    EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) || '(mpid, segid, datetimes, geo, uri, distance, direction2d, horizontalAngle, fovs, type) 
-    VALUES($1, 1, $2, $3, $4, $5, $6, $7 , $8, $9)'
-    USING mpid, timeline, tp, turi, tdistance, tdirection, tangle, tfov, mgeometry_types;
-	--get json ;
-	sql := 'select row_to_json((SELECT d from (select datetimes,geo,uri,fovs ) d)) from  ' || quote_ident(f_mgeometry_segtable_name) ;
-   	RAISE DEBUG '%', sql;
-    EXECUTE sql INTO annotations;		
-	EXECUTE 'update ' || quote_ident(f_mgeometry_segtable_name) || ' set annotations = ($4) WHERE mpid = $1'
-    USING  mpid, tp, timeline,annotations;
+	traj_prefix := 'mvideo_' ;		
+	f_mgeometry_segtable_name := traj_prefix || f_mgeometry.segid ;
+	mpid := f_mgeometry.moid;
+	----count number of mvideos
+	sql := 'SELECT COUNT(*) FROM ' || quote_ident(f_mgeometry_segtable_name) || 
+		' WHERE mpid = ' || f_mgeometry.moid;
+	RAISE DEBUG '%', sql;
+	EXECUTE sql INTO cnt_mpid;
+	----for indexing seg_table 
+	sql := 'select tpseg_size from mgeometry_columns where f_mgeometry_segtable_name  = ' || quote_literal(f_mgeometry_segtable_name);
+	RAISE DEBUG '%', sql;
+	EXECUTE sql INTO tp_seg_size;	
+	IF (cnt_mpid < 1) THEN
+		---mpid, segid, mbr, datetimes, geo
+		EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) || '(mpid, segid, mbr, datetimes, geo, horizontalAngle, verticalAngle, direction2d, direction3d, distance, uri) 
+			VALUES($1, 1, st_geomfromtext(st_astext(st_makebox2d($3::geometry, $3::geometry))), ARRAY[$2]::bigint[], ARRAY[$3]::Point[], 
+			ARRAY[$4]::double precision[], ARRAY[$5]::double precision[], ARRAY[$6]::double precision[], ARRAY[$7]::double precision[], ARRAY[$8]::double precision[], ARRAY[$9]::character varying[])'
+		USING mpid, timeline, tp, vangle, hangle, dir2d, dir3d, dist, uris;
 	END IF;
-    return f_mgeometry;
+    ----have points in mvideo
+	IF(cnt_mpid > 0) THEN
+		sql := 'select max(segid) from ' || quote_ident(f_mgeometry_segtable_name) ||
+				' where mpid = ' || f_mgeometry.moid;
+		EXECUTE sql INTO segid;
+		sql := 'select array_upper((select geo from ' || quote_ident(f_mgeometry_segtable_name) || 
+			' where mpid = ' || f_mgeometry.moid || ' and segid = ' || segid || '), 1)';
+		RAISE DEBUG '%', sql;
+		EXECUTE sql INTO max_tpseg_count;
+		----add array videos and times	
+		IF( segid IS NOT NULL AND max_tpseg_count < tp_seg_size) THEN
+			EXECUTE 'UPDATE ' || quote_ident(f_mgeometry_segtable_name) || 
+				' set datetimes = array_append(datetimes, $1), mbr = st_geomfromtext(st_astext(st_combinebbox( Box2D(mbr), $2::geometry))), geo = array_append(geo, $2),
+				horizontalAngle = array_append(horizontalAngle, $3), verticalAngle = array_append(verticalAngle, $4), direction2d = array_append(direction2d, $5), 
+				direction3d = array_append(direction3d, $6), distance = array_append(distance, $7), uri = array_append(uri, $8) 
+				where mpid = $9 and segid = $10'
+			USING timeline, tp, vangle, hangle, dir2d, dir3d, dist, uris, mpid, segid;
+		ELSE 
+			---split segment mvideo
+			new_segid := segid+1;
+			EXECUTE 'INSERT INTO ' || quote_ident(f_mgeometry_segtable_name) ||'(mpid, segid, mbr, datetimes, geo, horizontalAngle, verticalAngle, direction2d, direction3d, distance, uri) 
+				VALUES( $1, $2, st_geomfromtext(st_astext(st_makebox2d($3::geometry, $3::geometry))), ARRAY[$4]::bigint[], ARRAY[$5]::Point[],
+				ARRAY[$6]::double precision[], ARRAY[$7]::double precision[], ARRAY[$8]::double precision[], ARRAY[$9]::double precision[], ARRAY[$10]::double precision[], ARRAY[$11]::character varying[])'
+			USING f_mgeometry.moid, new_segid, tp, timeline, tp, vangle, hangle, dir2d, dir3d, dist, uris;				
+		END IF;
+	END IF;
+	RETURN f_mgeometry;
 END;
 $BODY$
   LANGUAGE plpgsql VOLATILE STRICT
   COST 100;
-ALTER FUNCTION public.append(mvideo, mcoordinate[], timestamp without time zone[], character varying[], double precision[], double precision[], double precision[], fov[] )
+ALTER FUNCTION public.append(mgeometry, point, bigint, double precision, double precision, double precision, double precision, double precision, character varying)
     OWNER TO postgres;
-	
-	
-
-  
-CREATE OR REPLACE FUNCTION append(mdouble, character varying) RETURNS mdouble AS
-$$
-DECLARE
-	c_trajectory	alias for $1;
-	array_mdouble	alias for $2;	
-	array_time	timestamp without time zone[];
-	array_double	double precision[];
-BEGIN
-	array_double =regexp_split_to_array(mdoubledouble(array_mdouble),';')::double precision[];
-	array_time = regexp_split_to_array(mdoubletime(array_mdouble),',') ::timestamp without time zone[];	
-	execute 'select append( $1, $2, $3)'
-	using c_trajectory, array_double,array_time;	
-	RETURN c_trajectory;
-END
-$$
-LANGUAGE 'plpgsql' VOLATILE STRICT
-COST 100;
-
-
-CREATE OR REPLACE FUNCTION append(mpoint, character varying) RETURNS mpoint AS
-$$
-DECLARE
-	c_trajectory	alias for $1;
-	array_mpoint	alias for $2;
-	array_time	timestamp without time zone[];
-	array_point	mcoordinate[];
-BEGIN
-	array_time = regexp_split_to_array(mpointtime(array_mpoint),',') ::timestamp without time zone[];
-	array_point = regexp_split_to_array(mpointpoint(array_mpoint),';') ::mcoordinate[];	
-	execute 'select append( $1, $2, $3 )'
-	using c_trajectory, array_point,array_time;
-	RETURN c_trajectory;
-END
-$$
-LANGUAGE 'plpgsql' VOLATILE STRICT
-COST 100;
-
-
-  
-  
-CREATE OR REPLACE FUNCTION mcoordinate(
-    double precision,
-    double precision,
-	double precision)
-  RETURNS mcoordinate AS
-$BODY$
-DECLARE
-    pointx        alias for $1;
-    pointy        alias for $2;
-	pointz        alias for $3;
-    tp            mcoordinate;
-BEGIN    
-    tp.pointx := pointx;
-    tp.pointy := pointy;
-	tp.pointz := pointz;
-    RETURN tp;
-END
-$BODY$
-  LANGUAGE plpgsql VOLATILE STRICT
-  COST 100;
-ALTER FUNCTION mcoordinate(double precision, double precision, double precision)
-  OWNER TO postgres;
-
-  
-  
-CREATE OR REPLACE FUNCTION append(mvideo, character varying) RETURNS mvideo AS
-$$
-DECLARE
-	c_trajectory	alias for $1;
-	array_mvideo	alias for $2;
-	array_time		timestamp without time zone[];
-	array_point		mcoordinate[];
-	array_uri		character varying[];
-	array_fovdis	double precision[];
-	array_fovdir	double precision[];
-	array_fovang	double precision[];
-	array_fov		fov[];
-	i				integer;
-	array_size		integer;
-	fovs			fov;
-BEGIN
-	array_time = regexp_split_to_array(mvideotime(array_mvideo),',') ::timestamp without time zone[];
-	array_point = regexp_split_to_array(mvideopoint(array_mvideo),';') ::mcoordinate[];	
-	array_uri = regexp_split_to_array(mvideouri(array_mvideo),';') ::character varying[];
-	array_fovdis = regexp_split_to_array(mvideodistance(array_mvideo),';') ::double precision[];
-	array_fovdir = regexp_split_to_array(mvideodirection(array_mvideo),';') ::double precision[];
-	array_fovang = regexp_split_to_array(mvideoangle(array_mvideo),';') ::double precision[];
-	execute 'select array_upper( $1, 1 )'
-	into array_size using array_point;
-
-	i := 1;
-	WHILE( i <= array_size ) LOOP
-		---fovs.geo := array_point[i];
-		fovs.horizontalAngle := array_fovang[i];
-		fovs.direction2d := array_fovdir[i];
-		fovs.distance := array_fovdis[i];
-		array_fov[i] = fovs;
-		i := i+1;
-	END LOOP;
-	execute 'select append( $1, $2, $3, $4, $5, $6, $7, $8 )'
-	using c_trajectory, array_point, array_time, array_uri, array_fovdis, array_fovdir, array_fovang, array_fov;		
-	RETURN c_trajectory;
-END
-$$
-LANGUAGE 'plpgsql' VOLATILE STRICT
-COST 100;  
-
-
-
-
-CREATE OR REPLACE FUNCTION public.append(
-    stphoto,
-    character varying)
-  RETURNS stphoto AS
-$BODY$
-DECLARE
-    c_trajectory	alias for $1;
-	stphotostring	alias for $2;
-	moid			oid;
-	uris			text;
-	width			integer;
-	height			integer;
-	t				timestamp without time zone;
-	geo				mcoordinate;
-	fov				fov;
-	sql				text;
-	st				stphoto;
-BEGIN	
-
-	uris = split_part(split_part(split_part(stphotostring,'(',2), ')',1),' ',1);
-	raise info '%', uris;
-	width = split_part(split_part(split_part(stphotostring,'(',2), ')',1),' ',2);
-	height = split_part(split_part(split_part(stphotostring,'(',2), ')',1),' ',3);
-	fov.horizontalAngle = split_part(split_part(split_part(stphotostring,'(',3), ')',1),' ',3);
-	fov.direction2d = split_part(split_part(split_part(stphotostring,'(',3), ')',1),' ',1);
-	fov.distance = split_part(split_part(split_part(stphotostring,'(',3), ')',1),' ',5);
-	geo.pointx = split_part(split_part(split_part(stphotostring,'(',4), ')',1),' ',1);
-	raise info '%', geo.pointx ;
-	geo.pointy = split_part(split_part(split_part(stphotostring,'(',4), ')',1),' ',2);
-	raise info '%', geo.pointy ;
-	geo.pointz = 'NaN';
-	raise info '%', geo.pointz ;
-	t =  TIMESTAMP WITHOUT TIME ZONE 'epoch' + ((split_part(stphotostring,')',3))::bigint)* INTERVAL '1 second';
-	st.uri = uris;
-	st.fov =fov;
-	st.t = t;
-	st.geo = geo;
-	st.width = width;
-	st.height = height;
-	st.moid := c_trajectory.moid;
-	---EXECUTE 'update userstphotos set st = ($1) WHERE id = $2'
-   --- USING   st, moid;
-	raise info '%', st;
-    return st;
-END;
-$BODY$ 
-  LANGUAGE plpgsql VOLATILE STRICT
-  COST 100;
+    
+    
+    
+    
+    
   

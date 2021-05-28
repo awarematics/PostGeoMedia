@@ -1,4 +1,8 @@
-
+CREATE TYPE mgeometry AS
+(
+   moid oid,
+   segid text 
+);
 
 CREATE TYPE fov AS
 (
@@ -9,18 +13,12 @@ CREATE TYPE fov AS
    distance double precision
 );
 
-CREATE TYPE mcoordinate AS
-(
-	pointx double precision,
-	pointy double precision,
-	pointz double precision
-);
 
 CREATE TYPE frame AS
 (
    relativeTime bigint,
    framefov fov,   
-   geo      mcoordinate
+   geo      point
 );
 
 
@@ -33,7 +31,7 @@ CREATE TYPE period AS
 
 CREATE TYPE mpoint AS
 (
-	geo mcoordinate[],
+	geo point[],
 	t bigint[]
 );
 
@@ -46,4 +44,73 @@ CREATE TYPE mvideo AS
    frames frame[],
    afov fov             
 );
+
+
+CREATE TYPE mperiod AS
+(
+	fromtime bigint[],
+	totime bigint[]
+);
+
+
+CREATE TYPE mdouble AS
+(
+	doubles double precision[],
+	t 	bigint[]
+);
+
+
+CREATE TYPE mbool AS
+(
+	bools boolean[],
+	t 	bigint[]
+);
+
+
+
+CREATE TYPE mpolygon AS
+(
+	polygons polygon[],
+		t bigint[]
+);
+
+
+
+CREATE TYPE mduration AS   ----continue time
+(
+	duration bigint[]
+);
+
+CREATE TYPE minstant AS    ----instant
+(
+	t bigint[]
+);
+
+CREATE TYPE mint AS   
+(
+	ints integer[]
+);
+
+
+CREATE TYPE mstring AS
+(
+	mstrings text[],
+	t bigint[]
+);
+
+CREATE TYPE mlinestring AS
+(
+	mlinestrings text[],
+	t bigint[]
+);
+
+
+
+
+
+
+
+
+
+
 
