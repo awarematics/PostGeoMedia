@@ -23,15 +23,17 @@ import com.awarematics.postmedia.types.mediamodel.MVideo;
 
 import org.postgresql.pljava.annotation.Function;
 
+import static org.postgresql.pljava.annotation.Function.Effects.IMMUTABLE;
+import static org.postgresql.pljava.annotation.Function.OnNullInput.RETURNS_NULL;
 
 
 //--m_astext(mgeometry)
 public class SpatialTemporalOP {
-	@Function
-	public static String m_astext(String[] geometry, long[] time, String uri, double[] hangle, double[] vangle, double[] dir2d, double[] dir3d, double[] dis)
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static String m_astext(String[] points, long[] timetext, String uri, double[] hangle, double[] vangle, double[] dir2d, double[] dir3d, double[] dis)
 			throws ParseException, org.locationtech.jts.io.ParseException {
 		
-
+		MGeometryFactory geometryFactory = new MGeometryFactory();
 		Frame[] frame = new Frame[points.length];
 		Coordinate[] coos = new Coordinate[points.length];
 		for(int i = 0; i < points.length; i++)
@@ -49,25 +51,75 @@ public class SpatialTemporalOP {
 			frame[i] = new Frame();
 			frame[i].setFov(fovs);
 		}	
-		MPoint mps = geometryFactory.createMPoint(coos, time);
+		MPoint mps = geometryFactory.createMPoint(coos, timetext);
 		MVideo mvs = geometryFactory.createMVideo(uri, mps, null, null, frame[0].getFov(), frame);		
 		return mvs.toGeoString();
 	}
 	 
-	@Function
-	public static String m_astext(String[] geometry, long[] time)
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static String m_astext(String[] points, long[] timetext)
 			throws ParseException, org.locationtech.jts.io.ParseException {
-		
+		MGeometryFactory geometryFactory = new MGeometryFactory();
 		Coordinate[] coos = new Coordinate[points.length];
 		for(int i = 0; i < points.length; i++)
 		{
 			coos[i] = new Coordinate();
 			String pointtext = points[i].substring(1, points[i].length()-1);
 			coos[i].x = Double.parseDouble(pointtext.split(",")[0]);
-			coos[i].y = Double.parseDouble(pointtext.split(",")[1]);
-		
+			coos[i].y = Double.parseDouble(pointtext.split(",")[1]);	
 		}	
-		MPoint mps = geometryFactory.createMPoint(coos, time);
+		MPoint mps = geometryFactory.createMPoint(coos, timetext);
 		return mps.toGeoString();
 	}
+	
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static boolean m_tintersects(long[] timetext, String period)
+			throws ParseException{
+		String periodtext = period.substring(1, period.length()-1);
+		double fromtime = Double.parseDouble(periodtext.split(",")[0]);
+		double totime = Double.parseDouble(periodtext.split(",")[1]);
+		
+		if(timetext[0] > totime || timetext[length-1] < fromtime )
+			return false;
+		
+		return true;
+	}
+	
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static String m_spatial(String[] geotext)
+			throws ParseException{
+		GeometryFactory geometryFactory = new GeometryFactory();
+		Coordinate[] coos = new Coordinate[geotext.length];
+		for(int i = 0; i < geotext.length; i++)
+		{
+			coos[i] = new Coordinate();
+			String pointtext = geotext[i].substring(1, geotext[i].length()-1);
+			coos[i].x = Double.parseDouble(pointtext.split(",")[0]);
+			coos[i].y = Double.parseDouble(pointtext.split(",")[1]);	
+		}	
+		LineString mps = geometryFactory.createLineString(coos);
+		return mps.toText();
+	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
