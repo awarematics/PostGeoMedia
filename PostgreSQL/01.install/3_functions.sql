@@ -4,9 +4,9 @@
 
 --m_astext(mpoint) text
 	
-CREATE OR REPLACE FUNCTION public.m_astext(
-	mgeometry)
-    RETURNS SETOF text
+
+CREATE OR REPLACE FUNCTION public.m_astext(mgeometry)
+    RETURNS text
     LANGUAGE 'plpgsql'	
     COST 100
     VOLATILE STRICT 
@@ -15,22 +15,62 @@ DECLARE
 	f_mgeometry			alias for $1;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	trajid				integer;
+	points				geometry[];
+	times				bigint[];
 	mpid                integer;
 	results				text;
+	traj_prefix			text;
+	trajid				integer;
+	typename			text;
+	uritext				text;
+	horizontalangle		double precision[];
+	verticalangle		double precision[];
+	direction2d			double precision[];
+	direction3d			double precision[];
+	distance			double precision[];
+	
 BEGIN
-	 sql := 'select f_segtableoid  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	sql := 'select f_segtableoid  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO trajid;
 	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-    mpid := f_mgeometry.moid;	
-	sql := 'select wkttraj from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-    RETURN QUERY EXECUTE sql;
+	sql := 'select type  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO typename;
+	mpid := f_mgeometry.moid;
+	--raise info '%', typename;
+	
+	IF (typename = 'mvideo') THEN
+	sql := 'select geo::geometry[] from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into points;
+	sql := 'select  datetimes from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into times;
+	sql := 'select  uri from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into uritext;
+	sql := 'select  horizontalangle from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into horizontalangle;
+	sql := 'select  verticalangle from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into verticalangle;
+	sql := 'select  direction2d from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into direction2d;
+	sql := 'select  direction3d from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into direction3d;
+	sql := 'select  distance from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into distance;
+	results := m_astext(points, times, uritext, horizontalangle, verticalangle, direction2d, direction3d, distance);
+	ELSE
+		IF (typename = 'mpoint') THEN
+		sql := 'select geo::geometry[] from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    	EXECUTE sql into points;
+		sql := 'select  datetimes from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	 	EXECUTE sql into times;
+		results := m_astext(points, times);
+		END IF;
+	END IF;
+	return results;
 END
 $BODY$;
 ALTER FUNCTION public.m_astext(mgeometry)
     OWNER TO postgres;
-    
     
     
     
@@ -627,7 +667,7 @@ DECLARE
 	f_mgeometry1			alias for $1;
 	f_mgeometry2			alias for $2;
 	f_mgeometry_segtable_name	char(200);
-	results				text;
+	results				text;(
 	sql					text;
 	trajid				integer;
 	mpid                integer;

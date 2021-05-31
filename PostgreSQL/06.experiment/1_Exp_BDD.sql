@@ -14,3 +14,5 @@ CREATE TABLE mgeometry_columns
 	f_sequence_name character varying(256) NOT NULL,
 	tpseg_size	integer
 );
+
+
