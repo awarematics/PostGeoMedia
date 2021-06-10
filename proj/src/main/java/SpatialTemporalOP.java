@@ -79,7 +79,7 @@ public class SpatialTemporalOP {
 		double fromtime = Double.parseDouble(periodtext.split(",")[0]);
 		double totime = Double.parseDouble(periodtext.split(",")[1]);
 		
-		if(timetext[0] > totime || timetext[length-1] < fromtime )
+		if(timetext[0] > totime || timetext[timetext.length-1] < fromtime )
 			return false;
 		
 		return true;

@@ -187,5 +187,396 @@ $BODY$;
 ALTER FUNCTION public.m_sintersects(mgeometry, geometry)
     OWNER TO postgres;	
 	
+-----m_spatial(mgeometry)
 
+	
+CREATE OR REPLACE FUNCTION public.m_spatial(
+	mgeometry)
+	RETURNS geometry
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	points				text[];
+	mpid                integer;
+	spatials			text;
+	trajid				integer;
+BEGIN
+	sql := 'select f_segtableoid  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;	
+	sql := 'select geo::text[] from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+    EXECUTE sql into points;
+
+	spatials := m_spatial(points)::geometry;
+	return spatials;
+END;
+$BODY$;
+ALTER FUNCTION public.m_spatial(mgeometry)
+    OWNER TO postgres;	
+	
+	
+
+
+----------------------m_time()
+
+CREATE OR REPLACE FUNCTION public.m_time(
+	mgeometry)
+	RETURNS period
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	times				bigint[];
+	mpid                integer;
+	periods			text;
+	trajid				integer;
+BEGIN
+	sql := 'select f_segtableoid  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;	
+	sql := 'select  datetimes from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into times;
+	
+	periods := '('||times[1]||','||times[array_length(times,1)]||')';
+	return periods::period;
+END;
+$BODY$;
+ALTER FUNCTION public.m_time(mgeometry)
+    OWNER TO postgres;	
 		
+		
+		
+		
+-----------------------------m_tintersects_index
+		
+	
+CREATE OR REPLACE FUNCTION public.m_tintersects_index(
+	mgeometry,
+	period)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_period			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	mpid                integer;
+	timerange			int8range;
+	trajid				integer;
+	results				boolean;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+	sql := 'select timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into timerange;
+	
+	IF (timerange @> f_period.fromtime or timerange @> f_period.totime ) THEN
+			RETURN true;
+	ELSE
+			RETURN false;
+	END IF;
+	RETURN results;
+END;
+$BODY$;
+ALTER FUNCTION public.m_tintersects_index(mgeometry, period)
+    OWNER TO postgres;		
+	
+	
+CREATE OR REPLACE FUNCTION public.m_tintersects_index(
+	mgeometry,
+	period)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_period			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	times				bigint[];
+	mpid                integer;
+	timerange			int8range;
+	trajid				integer;
+	results				boolean;
+	cnt					integer;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+	sql := 'select timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into timerange;
+	
+	sql :='';
+	IF (timerange @> f_period.fromtime or timerange @> f_period.totime ) THEN
+		sql := sql || ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
+		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and m_tintersects(mgeo.datetimes, $1::text);';
+   		EXECUTE sql INTO cnt using f_period;
+	
+		IF cnt > 0 THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;		
+	END IF;
+	RETURN results;
+END;
+$BODY$;
+ALTER FUNCTION public.m_tintersects_index(mgeometry, period)
+    OWNER TO postgres;		
+	
+	
+	
+		
+-----------------------------m_sintersects_index
+		
+
+
+CREATE OR REPLACE FUNCTION public.m_sintersects_index(
+	mgeometry,
+	geometry)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	mpid                integer;
+	mbr			geometry;
+	trajid				integer;
+	results				boolean;
+	cnt					integer;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+	sql := 'select  mbr from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into mbr;
+
+	IF (mbr && f_geometry) THEN
+		sql := ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
+		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1);';
+   		EXECUTE sql INTO cnt using f_geometry;
+		IF cnt > 0 THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;		
+	END IF;
+	results := false;
+	RETURN results;
+END;
+$BODY$;
+
+ALTER FUNCTION public.m_sintersects_index(mgeometry, geometry)
+    OWNER TO postgres;
+		
+		
+	-----------------------------m_intersects_index	
+	
+CREATE OR REPLACE FUNCTION public.m_intersects_index(
+	integer,
+	integer)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	f_sid				alias for $1;
+	f_tid				alias for $2;
+	sql					text;
+	cnt					integer;
+BEGIN
+	
+	if(f_sid = f_tid) then
+		return true;
+		END IF;
+	RETURN false;
+END;
+$BODY$;
+
+ALTER FUNCTION public.m_intersects_index(integer, integer)
+    OWNER TO postgres;
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION public.m_tintersects_id(
+	mgeometry,
+	period)
+    RETURNS integer
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_period			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	mpid                integer;
+	times				int8range;
+	trajid				integer;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+	sql := 'select  timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into times;
+
+	IF (times && (f_period::text)::int8range) THEN
+		RETURN mpid;
+	END IF;
+	return null;
+END;
+$BODY$;
+
+ALTER FUNCTION public.m_tintersects_id(mgeometry, period)
+    OWNER TO postgres;
+
+
+
+
+
+CREATE OR REPLACE FUNCTION public.m_sintersects_id(
+	mgeometry,
+	geometry)
+    RETURNS integer
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	mpid                integer;
+	mbr					geometry;
+	trajid				integer;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+	sql := 'select  mbr from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
+   	EXECUTE sql into mbr;
+	IF (mbr && f_geometry) THEN
+	---------------id
+		sql := 'SELECT mpid from ' || (f_mgeometry_segtable_name) || ' mgeo';
+		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' AND st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1)';
+   		EXECUTE sql into mpid using f_geometry;
+	END IF;
+	RETURN null;
+END;
+$BODY$;
+
+ALTER FUNCTION public.m_sintersects_id(mgeometry, geometry)
+    OWNER TO postgres;
+
+	
+	
+
+
+
+CREATE OR REPLACE FUNCTION public.m_sintersects(
+	mgeometry,
+	geometry,period)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_period			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	times				bigint[];
+	mpid                integer;
+	mbr			geometry;
+	trajid				integer;
+	results				boolean;
+	cnt					integer;
+BEGIN
+
+	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	mpid := f_mgeometry.moid;
+
+		sql := ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
+		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1) and m_tintersects($2,$3);';
+   		EXECUTE sql INTO cnt using f_geometry, f_mgeometry, f_period;
+	
+		IF cnt > 0 THEN
+			RETURN true;
+		ELSE
+			RETURN false;
+		END IF;		
+	results := false;
+	RETURN results;
+END;
+$BODY$;
+ALTER FUNCTION public.m_sintersects(mgeometry, geometry, period)
+    OWNER TO postgres;		
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

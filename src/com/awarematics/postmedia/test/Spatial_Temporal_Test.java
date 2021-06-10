@@ -65,6 +65,17 @@ public class Spatial_Temporal_Test {
 		MVideo mvs = geometryFactory.createMVideo("urti", mps, null, null, frame[0].getFov(), frame);
 		System.out.println(m_spatial(points));
 		}
+	public static boolean m_tintersects(long[] timetext, String period)
+			throws ParseException{
+		String periodtext = period.substring(1, period.length()-1);
+		double fromtime = Double.parseDouble(periodtext.split(",")[0]);
+		double totime = Double.parseDouble(periodtext.split(",")[1]);
+		
+		if(timetext[0] > totime || timetext[timetext.length-1] < fromtime )
+			return false;
+		
+		return true;
+	}
 	
 	public static String m_spatial(String[] geotext)
 			throws ParseException{
