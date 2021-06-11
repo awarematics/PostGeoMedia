@@ -36,13 +36,15 @@
 ### Create TABLE examples with MVideo types
 
 ```
-CREATE TABLE BDDTrack
-(
-  id integer,
-  mission character varying(20),
-  auxinfo character varying(100),
-  times timestamp without time zone
+
+ create table car(
+	taxi_id integer primary key,
+	taxi_number varchar,
+	taxi_model varchar,
+	taxi_driver varchar
 );
+
+ 
 
 CREATE TABLE mgeometry_columns
 (
@@ -53,48 +55,117 @@ CREATE TABLE mgeometry_columns
 	f_mgeometry_segtable_name character varying(256) NOT NULL,
 	mgeometry_compress character varying(256),
 	coord_dimension integer,
-	srid	integer,
+	srid integer,
 	"type" character varying(30),
-	f_mgeometrytableid character varying(256) NOT NULL,
+	f_segtableoid character varying(256) NOT NULL,
 	f_sequence_name character varying(256) NOT NULL,
-	mgeounit_size	integer
-)
-WITH (
-  OIDS=TRUE
+	tpseg_size	integer
 );
 
-select * from mgeometry_columns;
+
 ```
 ### Insert Examples 
 ```
 
-INSERT into BDDMVideo(id, mission,auxinfo,times) values(1,'kunsan','test work5','2018-10-25 01:00:55');
-INSERT into BDDMVideo(id, mission,auxinfo,times) values(2,'kunsan','test work6','2018-10-25 01:00:57');
-select * from bddmvideo;
-select * from bddgeophoto;
+insert into car values(1, '57NU2001', 'Optima', 'hongkd7');
+insert into car values(2, '57NU2002', 'SonataYF', 'hongkd7');
 
-select addmgeometrycolumns('public','bddmvideo','mvideo',4326,'mvideo',2, 50);
-select * from bddmvideo;
 
-select * from bddgeophoto;
+select addmgeometrycolumn('public', 'car', 'mpoint', 4326, 'mpoint', 2, 50);
+select addmgeometrycolumn('public', 'car', 'mvideo', 4326, 'mvideo', 2, 50);
+
+select * from car;
+
 
 ``` 
 
 ### Append Examples 
 ```
 
-INSERT into BDDMVideo(id, mission,auxinfo,times) values(1,'kunsan','test work5','2018-10-25 01:00:55');
-INSERT into BDDMVideo(id, mission,auxinfo,times) values(2,'kunsan','test work6','2018-10-25 01:00:57');
-select * from bddmvideo;
-select * from bddgeophoto;
+UPDATE car 
+SET    mpoint = append(mpoint, ('POINT (200 200)'::geometry)::point,'1180389003000'::bigint) 
+WHERE  taxi_id = 1;
 
-select addmgeometrycolumns('public','bddmvideo','mvideo',4326,'mvideo',2, 50);
-select * from bddmvideo;
-
-select * from bddgeophoto;
+UPDATE car 
+SET    mvideo = append(mvideo, ('POINT (200 200)'::geometry)::point, '1180389003000'::bigint, 1.0, 2.0, 3.0, 5.0, 6.0, 'http://u-gist/1.mp4') 
+WHERE  taxi_id = 1;
 
 
 ``` 
+
+### Range Queries
+
+### Temporal Range Queries
+```
+---temporal range query
+
+--- basic temporal query with index
+---Execution Time: 7788.456 ms
+
+explain analyze	
+select  *
+from car a, queryperiod b
+where m_tintersects(a.mpoint, b.times)
+
+--- temporal range query with optimization index
+--- Execution Time: 6876.625 ms
+explain analyze	
+select *
+from car a, queryperiod b
+where m_tintersects_index(a.mpoint, b.times) 	
+
+
+
+
+```
+
+### Spatial Range Queries
+```
+
+--- basic spatial query with index
+--- Execution Time: 31070.263 ms
+explain analyze	
+select *
+from car a, querylinestring b
+where m_sintersects(a.mpoint, b.geo) 
+
+--- spatial range query with optimization index
+--- Execution Time: 7328.937 ms
+explain analyze	
+select *
+from car a, querylinestring b
+where m_sintersects_index(a.mpoint, b.geo) 
+
+
+
+```
+
+### Spatial-temporal Range Queries
+```
+
+--- basic spatial-temporal query with index
+--- Execution Time: 8344.807 ms
+--- nest loop 1620348493.90 rows=2053055795
+explain analyze	
+select *
+from car a, queryperiod b, querylinestring c
+where m_sintersects(a.mpoint, c.geo) 
+AND m_tintersects(a.mpoint, b.times)
+
+--- spatial-temporal range query with optimization index
+--- Execution Time: 7547.573 ms
+--nest loop 3566866.90 rows=13518468 
+
+explain analyze	
+select *
+from car a, queryperiod b, querylinestring c
+where m_tintersects_id(a.mpoint, b.times) IS NOT NULL 
+AND m_sintersects_id(a.mpoint, c.geo) IS NOT NULL
+AND m_intersects_index(m_tintersects_id(a.mpoint, b.times), m_sintersects_id(a.mpoint, c.geo))
+
+
+
+```
 
 ### BerlinMOD Queries
 

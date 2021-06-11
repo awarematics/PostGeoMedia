@@ -503,7 +503,7 @@ BEGIN
 	IF (mbr && f_geometry) THEN
 	---------------id
 		sql := 'SELECT mpid from ' || (f_mgeometry_segtable_name) || ' mgeo';
-		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' AND st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1)';
+		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' A ND st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1)';
    		EXECUTE sql into mpid using f_geometry;
 	END IF;
 	RETURN null;
