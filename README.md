@@ -184,8 +184,9 @@ FROM car a
 WHERE M_sIntersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') 
 
 SELECT *
-FROM car a, querylinestring b
-WHERE M_sIntersects(a.mpoint, b.geo) 
+FROM car a
+WHERE M_sIntersects(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)') //triangle 
+
 
 --- spatial range query with optimization index
 --- Execution Time: 7328.937 ms
@@ -193,10 +194,9 @@ WHERE M_sIntersects(a.mpoint, b.geo)
 SELECT *
 FROM car a
 WHERE M_sIntersects_index(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') 
-
 SELECT *
-FROM car a, querylinestring b
-WHERE M_sIntersects_index(a.mpoint, b.geo) 
+FROM car a
+WHERE M_sIntersects_index(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)') //triangle 
 
 ```
 ### Spatial-temporal Range Queries
@@ -208,13 +208,21 @@ WHERE M_sIntersects_index(a.mpoint, b.geo)
 
 SELECT *
 FROM car a, queryperiod b, querylinestring c
-WHERE M_sIntersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') 
-AND M_tIntersects(a.mpoint, 'Period (1000 2000)')
+WHERE M_Intersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
 SELECT *
 FROM car a, queryperiod b, querylinestring c
-WHERE M_sIntersects(a.mpoint, c.geo) 
-AND M_tIntersects(a.mpoint, b.times)
+WHERE M_Intersects(a.mpoint,  'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects_index(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects_index(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+
 
 --- spatial-temporal range query with optimization index
 --- Execution Time: 7547.573 ms
