@@ -11,8 +11,10 @@
  	MInstant : MINSTANT (15569113450, 15569114450, 15569115450, ...)
 	
 	MInt :  MINT (2 1556911346, 3 1556911347, ...)
+	// alternatively   MINT (2@1556911346, 3@1556911347, ...)
 	
- 	MBool :  MBOOL (ture 1000, false 1000, true ...)   
+ 	MBool :  MBOOL (ture 1000, false 1000, true ...)  
+	// alternatively   MBOOL (ture@1000, false@1000, true ...)
 	
  	MDouble : MDOUBLE (1743.6106216698727 1556811344, 1587.846969956488 1556911345 ...)
 	
@@ -26,7 +28,7 @@
 	
  	MPolygon : MPOLYGON ((0 0, 1 1, 1 0, 0 0) 1000, (0 0, 1 1, 1 0, 0 0) 2000 ...)
 	
-	MVideo :  MVIDEO ('localhost:///tmp/drone/test1.jpg', MPOINT ((0.0 0.0) 1481480632123, (2.0 5.0) 1481480637123 ...), FRAME ((60 0 0.1 30 0 0), (60 0 0.1 30 0 0)...))
+	MVideo :  MVIDEO ('localhost:///tmp/drone/test1.mp4', MPOINT ((0.0 0.0) 1481480632123, (2.0 5.0) 1481480637123 ...), FRAME ((60 0 0.1 30 0 0), (60 0 0.1 30 0 0)...))
  	
 	MPhoto :  MPHOTO (('localhost:///tmp/drone/test1.jpg' 200 200 60 0 0.1 30 0 0 'annotation' 'exif' 100 100) 1481480632123 ...)
 
@@ -87,9 +89,25 @@ SET    mpoint = append(mpoint, ('POINT (200 200)'::geometry)::point,'11803890030
 WHERE  taxi_id = 1;
 
 UPDATE car 
+SET    mpoint = append(mpoint, 'MPOINT ((0.0 0.0) 1481480632123)') 
+WHERE  taxi_id = 1;
+ 
+UPDATE car 
+SET    mpoint = append(mpoint, ('MPOINT ((200 200)@1180389003000, (203 208)@1180389004000)' ) 
+WHERE  taxi_id = 1;
+
+UPDATE car 
 SET    mvideo = append(mvideo, ('POINT (200 200)'::geometry)::point, '1180389003000'::bigint, 1.0, 2.0, 3.0, 5.0, 6.0, 'http://u-gist/1.mp4') 
 WHERE  taxi_id = 1;
 
+--default : MVIDEO is "MVIDEO_SIMPLE"
+UPDATE car 
+SET    mvideo = append(mvideo, ('MVDIDEO ((200 200)@1180389003000, (203 208)@1180389004000), 'http://u-gist/1.mp4') 
+WHERE  taxi_id = 1;
+
+UPDATE car 
+SET    mvideo = append(mvideo, ('MVDIDEO_FULL ((200 200)@1180389003000, (203 208)@1180389004000),__________ 'http://u-gist/1.mp4') 
+WHERE  taxi_id = 2;
 
 ### UDF Function Examples 
 ```
@@ -136,6 +154,8 @@ FROM bdd10k;
 SELECT  *
 FROM car a 
 WHERE M_tIntersects(a.mpoint, 'Period (1000 2000)')
+
+#
 
 SELECT  *
 FROM car a, queryperiod b
