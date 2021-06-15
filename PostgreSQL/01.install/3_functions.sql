@@ -5,6 +5,7 @@
 --m_astext(mpoint) text
 	
 
+
 CREATE OR REPLACE FUNCTION public.m_astext(mgeometry)
     RETURNS text
     LANGUAGE 'plpgsql'	
@@ -29,7 +30,7 @@ DECLARE
 	distance			double precision[];
 	
 BEGIN
-	sql := 'select f_segtableoid  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
 	sql := 'select type  from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO typename;
@@ -65,7 +66,6 @@ END
 $BODY$;
 ALTER FUNCTION public.m_astext(mgeometry)
     OWNER TO postgres;
-
     
     
     
@@ -88,15 +88,21 @@ DECLARE
 	sql					text;
 	times				bigint[];
 	mpid                integer;
-	results				text;
+	cnt					integer;
 BEGIN
 	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
 	mpid := f_mgeometry.moid;
 	sql := 'select  datetimes from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
    	EXECUTE sql into times;
-	results := m_tintersects(times, f_period::text);
-	return results;
+	
+	sql := ' SELECT COUNT(*) FROM ' || f_mgeometry_segtable_name;
+	sql := sql || ' where mpid = ' || f_mgeometry.moid ||' AND m_tintersects(datetimes, $1::text) ';
+	EXECUTE sql INTO cnt USING f_period;
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;
+	return false;
 END;
 $BODY$;
 ALTER FUNCTION public.m_tintersects(mgeometry, period)
@@ -152,20 +158,19 @@ DECLARE
 	f_mgeometry			alias for $1;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	points				text[];
+	points				geometry;
 	spatials			geometry;
 BEGIN
 	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-	sql := 'select geo from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||quote_literal(f_mgeometry.moid);
-    EXECUTE sql into points;
-
-	spatials := ST_MakeLine(points);
+	sql := 'select st_union(geo::geometry[]) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||quote_literal(f_mgeometry.moid);
+    EXECUTE sql into spatials;
 	return spatials;
 END;
 $BODY$;
 ALTER FUNCTION public.m_spatial(mgeometry)
     OWNER TO postgres;	
+	
 	
 
 
