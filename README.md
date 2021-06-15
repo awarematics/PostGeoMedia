@@ -210,16 +210,20 @@ where m_tintersects_index(mpoint, '(1494010956999,1504012995999)'::period);
 ```
 
 SELECT *
-FROM car a, queryperiod b, querylinestring c
-WHERE M_Intersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+FROM car 
+WHERE M_Intersects(mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
 SELECT *
-FROM car a, queryperiod b, querylinestring c
-WHERE M_Intersects(a.mpoint,  'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+FROM car a
+WHERE M_Intersects(mpoint,  'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
 SELECT *
-FROM car a, queryperiod b, querylinestring c
-WHERE M_Intersects_index(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+FROM car 
+WHERE M_Intersects_index(mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car 
+WHERE M_Intersects_index(mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
 ```
 
