@@ -11,8 +11,10 @@
  	MInstant : MINSTANT (15569113450, 15569114450, 15569115450, ...)
 	
 	MInt :  MINT (2 1556911346, 3 1556911347, ...)
+	// alternatively   MINT (2@1556911346, 3@1556911347, ...)
 	
- 	MBool :  MBOOL (ture 1000, false 1000, true ...)   
+ 	MBool :  MBOOL (ture 1000, false 1000, true ...)  
+	// alternatively   MBOOL (ture@1000, false@1000, true ...)
 	
  	MDouble : MDOUBLE (1743.6106216698727 1556811344, 1587.846969956488 1556911345 ...)
 	
@@ -26,7 +28,7 @@
 	
  	MPolygon : MPOLYGON ((0 0, 1 1, 1 0, 0 0) 1000, (0 0, 1 1, 1 0, 0 0) 2000 ...)
 	
-	MVideo :  MVIDEO ('localhost:///tmp/drone/test1.jpg', MPOINT ((0.0 0.0) 1481480632123, (2.0 5.0) 1481480637123 ...), FRAME ((60 0 0.1 30 0 0), (60 0 0.1 30 0 0)...))
+	MVideo :  MVIDEO ('localhost:///tmp/drone/test1.mp4', MPOINT ((0.0 0.0) 1481480632123, (2.0 5.0) 1481480637123 ...), FRAME ((60 0 0.1 30 0 0), (60 0 0.1 30 0 0)...))
  	
 	MPhoto :  MPHOTO (('localhost:///tmp/drone/test1.jpg' 200 200 60 0 0.1 30 0 0 'annotation' 'exif' 100 100) 1481480632123 ...)
 
@@ -87,8 +89,55 @@ SET    mpoint = append(mpoint, ('POINT (200 200)'::geometry)::point,'11803890030
 WHERE  taxi_id = 1;
 
 UPDATE car 
+SET    mpoint = append(mpoint, 'MPOINT ((0.0 0.0) 1481480632123)') 
+WHERE  taxi_id = 1;
+ 
+UPDATE car 
+SET    mpoint = append(mpoint, ('MPOINT ((200 200)@1180389003000, (203 208)@1180389004000)' ) 
+WHERE  taxi_id = 1;
+
+UPDATE car 
 SET    mvideo = append(mvideo, ('POINT (200 200)'::geometry)::point, '1180389003000'::bigint, 1.0, 2.0, 3.0, 5.0, 6.0, 'http://u-gist/1.mp4') 
 WHERE  taxi_id = 1;
+
+--default : MVIDEO is "MVIDEO_SIMPLE"
+UPDATE car 
+SET    mvideo = append(mvideo, ('MVDIDEO ((200 200)@1180389003000, (203 208)@1180389004000), 'http://u-gist/1.mp4') 
+WHERE  taxi_id = 1;
+
+UPDATE car 
+SET    mvideo = append(mvideo, ('MVDIDEO_FULL ((200 200)@1180389003000, (203 208)@1180389004000),__________ 'http://u-gist/1.mp4') 
+WHERE  taxi_id = 2;
+
+### UDF Function Examples 
+```
+select M_AsText( M_Time( mpoint ) )
+SELECT M_AsText(M_Spatial( 'MPOINT ((0.0 0.0) 1481480632123, (2.0 5.0) 1481480637123 ...)' );
+
+
+### SELECT Examples 
+--- 
+SELECT id, mpoint
+FROM bdd10k;
+
+---
+SELECT id, M_GEO2JSON( mpoint )
+FROM bdd10k;
+
+---
+SELECT id, M_AsText( m_time( mpoint ) )
+FROM bdd10k;
+
+---
+SELECT id, ST_AsText(m_spatial( mpoint ))
+FROM bdd10k;
+
+---
+SELECT id, m_sp( mpoint )
+FROM bdd10k;
+
+SELECT id, m_spatial( mpoint )
+FROM bdd10k;
 
 
 ``` 
@@ -102,66 +151,96 @@ WHERE  taxi_id = 1;
 --- basic temporal query with index
 ---Execution Time: 7788.456 ms
 
-explain analyze	
-select  *
-from car a, queryperiod b
-where m_tintersects(a.mpoint, b.times)
+SELECT  *
+FROM car a 
+WHERE M_tIntersects(a.mpoint, 'Period (1000 2000)')
+
+#
+
+SELECT  *
+FROM car a, queryperiod b
+WHERE M_tIntersects(a.mpoint, b.times)
 
 --- temporal range query with optimization index
 --- Execution Time: 6876.625 ms
-explain analyze	
-select *
-from car a, queryperiod b
-where m_tintersects_index(a.mpoint, b.times) 	
 
+SELECT *
+FROM car a
+WHERE M_tIntersects_index(a.mpoint, 'Period (1000 2000)') 	
 
-
+SELECT *
+FROM car a, queryperiod b
+WHERE M_tIntersects_index(a.mpoint, b.times) 	
 
 ```
 
 ### Spatial Range Queries
 ```
-
 --- basic spatial query with index
 --- Execution Time: 31070.263 ms
-explain analyze	
-select *
-from car a, querylinestring b
-where m_sintersects(a.mpoint, b.geo) 
+
+SELECT *
+FROM car a
+WHERE M_sIntersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') 
+
+SELECT *
+FROM car a
+WHERE M_sIntersects(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)') //triangle 
+
 
 --- spatial range query with optimization index
 --- Execution Time: 7328.937 ms
-explain analyze	
-select *
-from car a, querylinestring b
-where m_sintersects_index(a.mpoint, b.geo) 
 
-
+SELECT *
+FROM car a
+WHERE M_sIntersects_index(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') 
+SELECT *
+FROM car a
+WHERE M_sIntersects_index(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)') //triangle 
 
 ```
-
 ### Spatial-temporal Range Queries
 ```
 
 --- basic spatial-temporal query with index
 --- Execution Time: 8344.807 ms
 --- nest loop 1620348493.90 rows=2053055795
-explain analyze	
-select *
-from car a, queryperiod b, querylinestring c
-where m_sintersects(a.mpoint, c.geo) 
-AND m_tintersects(a.mpoint, b.times)
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects(a.mpoint,  'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects_index(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_Intersects_index(a.mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+
+
 
 --- spatial-temporal range query with optimization index
 --- Execution Time: 6835.174 ms
 --nest loop 3566866.90 rows=13518468 
 
-explain analyze	
-select *
-from car a, queryperiod b, querylinestring c
-where m_tintersects_id(a.mpoint, b.times) IS NOT NULL 
-AND m_sintersects_id(a.mpoint, c.geo) IS NOT NULL
-AND m_intersects_index(m_tintersects_id(a.mpoint, b.times), m_sintersects_id(a.mpoint, c.geo))
+
+SELECT *
+FROM car a
+WHERE M_tIntersects_id(a.mpoint, 'Period (1000 2000)') IS NOT NULL 
+AND M_sIntersects_id(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)') IS NOT NULL
+AND M_Intersects_index(M_tIntersects_id(a.mpoint, 'Period (1000 2000)'), M_sIntersects_id(a.mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)'))
+
+
+SELECT *
+FROM car a, queryperiod b, querylinestring c
+WHERE M_tIntersects_id(a.mpoint, b.times) IS NOT NULL 
+AND M_sIntersects_id(a.mpoint, c.geo) IS NOT NULL
+AND M_Intersects_index(M_tIntersects_id(a.mpoint, b.times), M_sIntersects_id(a.mpoint, c.geo))
 
 
 
