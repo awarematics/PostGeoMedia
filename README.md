@@ -153,7 +153,7 @@ where m_sintersects(a.mpoint, c.geo)
 AND m_tintersects(a.mpoint, b.times)
 
 --- spatial-temporal range query with optimization index
---- Execution Time: 7547.573 ms
+--- Execution Time: 6835.174 ms
 --nest loop 3566866.90 rows=13518468 
 
 explain analyze	

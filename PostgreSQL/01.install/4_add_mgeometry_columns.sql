@@ -110,6 +110,21 @@ BEGIN
    		-- segment table name
     	f_mgeometry_segtable_name := 'mpoint_' || f_segtable_oid ;   
    	 	EXECUTE 'ALTER TABLE ' || quote_ident(temp_segtable_name) || ' RENAME TO ' || quote_ident(f_mgeometry_segtable_name);
+		-----index
+		sql := ' create index IF NOT EXISTS bl_index_mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_timerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
+    	EXECUTE sql;
+	
+	
 	
     	-- Add record in geometry_columns 
     	sql := 'INSERT INTO mgeometry_columns (f_table_catalog, f_table_schema, f_table_name, ' ||
@@ -202,6 +217,32 @@ BEGIN
     	sql := 'select '|| quote_literal(temp_segtable_name) ||'::regclass::oid';
    		RAISE DEBUG '%', sql;
     	EXECUTE sql INTO f_segtable_oid;
+		-----index
+		sql := ' create index IF NOT EXISTS bl_index_mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_timerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_horizontalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (horizontalAngle) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_verticalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (verticalAngle) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_direction2d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction2d) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_direction3d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction3d) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_distance on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (distance) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_uri on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (uri) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
+    	EXECUTE sql;
+		
    		-- segment table name
     	f_mgeometry_segtable_name := 'mvideo_' || f_segtable_oid ;   
    	 	EXECUTE 'ALTER TABLE ' || quote_ident(temp_segtable_name) || ' RENAME TO ' || quote_ident(f_mgeometry_segtable_name);
@@ -211,7 +252,7 @@ BEGIN
             'f_mgeometry_column, f_mgeometry_segtable_name, coord_dimension, srid, type, '|| 
             'f_segtableoid, f_sequence_name, tpseg_size)' ||
         	' VALUES (' ||
-       	 	quote_literal('') || ',' ||
+       	 	quote_literal('') || ',' || 
         	quote_literal(real_schema) || ',' ||
         	quote_literal(f_table_name) || ',' ||
         	quote_literal(f_column_name) || ',' ||
