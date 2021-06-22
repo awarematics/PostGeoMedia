@@ -86,28 +86,26 @@ DECLARE
 	f_period			alias for $2;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	times				bigint[];
-	mpid                integer;
 	cnt					integer;
+	res					bool;
 BEGIN
 	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select  datetimes from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into times;
-	
-	sql := ' SELECT COUNT(*) FROM ' || f_mgeometry_segtable_name;
-	sql := sql || ' where mpid = ' || f_mgeometry.moid ||' AND m_tintersects(datetimes, $1::text) ';
+	sql := 'select  mpid from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid)||
+	' AND  ((lower(timerange) <= ($1.fromtime) AND upper(timerange) >= ($1.fromtime)) 
+	OR (($1.fromtime) <= lower(timerange) AND $1.totime >= lower(timerange))) ' ;
+		--ABCD---->  ACBD  ACDB  CABD CADB
+		
 	EXECUTE sql INTO cnt USING f_period;
 		IF cnt > 0 THEN
 			RETURN true;
 		END IF;
 	return false;
+	return res;
 END;
 $BODY$;
 ALTER FUNCTION public.m_tintersects(mgeometry, period)
     OWNER TO postgres;	
-	
 	
 	
 	
@@ -207,49 +205,13 @@ ALTER FUNCTION public.m_time(mgeometry)
 		
 -----------------------------m_tintersects_index
 		
-	
-CREATE OR REPLACE FUNCTION public.m_tintersects_index(
-	mgeometry,
-	period)
-	RETURNS bool
-   LANGUAGE 'plpgsql'	
-    COST 100
-    VOLATILE STRICT 
-AS $BODY$
-DECLARE
-	f_mgeometry			alias for $1;
-	f_period			alias for $2;
-	f_mgeometry_segtable_name	char(200);
-	sql					text;
-	mpid                integer;
-	timerange			int8range;
-	trajid				integer;
-	results				boolean;
-BEGIN
+/*
+	m_tintersects_noindex    basic with no index
+*/
 
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into timerange;
-	
-	IF (timerange @> f_period.fromtime or timerange @> f_period.totime ) THEN
-			RETURN true;
-	ELSE
-			RETURN false;
-	END IF;
-	RETURN results;
-END;
-$BODY$;
-ALTER FUNCTION public.m_tintersects_index(mgeometry, period)
-    OWNER TO postgres;		
-	
-	
-CREATE OR REPLACE FUNCTION public.m_tintersects_index(
+CREATE OR REPLACE FUNCTION public.m_tintersects_noindex(
 	mgeometry,
-	period)
+	int8range)
 	RETURNS bool
    LANGUAGE 'plpgsql'	
     COST 100
@@ -260,39 +222,147 @@ DECLARE
 	f_period			alias for $2;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	times				bigint[];
-	mpid                integer;
-	timerange			int8range;
-	trajid				integer;
-	results				boolean;
 	cnt					integer;
 BEGIN
-
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into timerange;
-	
-	sql :='';
-	IF (timerange @> f_period.fromtime or timerange @> f_period.totime ) THEN
-		sql := sql || ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
-		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and m_tintersects(mgeo.datetimes, $1::text);';
-   		EXECUTE sql INTO cnt using f_period;
-	
+	sql := 'select  mpid from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid)||
+	' AND  ((lower(timerange) <= lower($1) AND upper(timerange) >= lower($1)) 
+	OR (lower($1) <= lower(timerange) AND upper($1) >= lower(timerange)))';		
+	EXECUTE sql INTO cnt USING f_period;
 		IF cnt > 0 THEN
 			RETURN true;
-		ELSE
-			RETURN false;
-		END IF;		
-	END IF;
-	RETURN results;
+		END IF;
+	return false;
 END;
 $BODY$;
-ALTER FUNCTION public.m_tintersects_index(mgeometry, period)
-    OWNER TO postgres;		
+ALTER FUNCTION public.m_tintersects_noindex(mgeometry, int8range)
+    OWNER TO postgres;	
+	
+/*
+	m_tintersects with index 
+*/	
+
+CREATE OR REPLACE FUNCTION public.m_tintersects_index(
+	mgeometry,
+	int8range)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_period			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnt					integer;
+	trantext			int8range;
+BEGIN
+
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	--trantext := (f_period::text)::int8range;
+	sql := 'select count(*) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid) ||' AND timerange && $1;';
+   	EXECUTE sql into cnt USING f_period;	
+	IF (cnt > 0) then 
+		RETURN true;
+	END IF;
+	RETURN false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_tintersects_index(mgeometry, int8range)
+    OWNER TO postgres;	
+	
+/*   
+   m_tintersects_materialized with index into temporal table
+*/
+
+CREATE OR REPLACE FUNCTION public.m_tintersects_materialized(
+	mgeometry,
+	int8range)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_period			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnt					integer;
+	meta_key 			text;
+	meta_value			text;
+	sql_text			varchar;
+	table_key			text;
+	session_key 			text;
+	session_value			text;
+	tmp_table			text;
+BEGIN
+	---------------mgeometry table
+	meta_key := 'temp.mgeometry.column';
+	BEGIN
+		meta_value := current_setting(meta_key);
+		--RAISE NOTICE 'meta_value :%', meta_value;
+	EXCEPTION when undefined_object then
+		perform set_config(meta_key, '0', false);	     
+		meta_value := current_setting(meta_key);
+	END;	
+	IF (meta_value = '0') THEN	
+		perform set_config(meta_key, '1', false);
+		table_key := 'temp_mgeometry_column';
+		sql_text := 'CREATE  temporary TABLE '|| table_key || ' as ';
+		sql_text := sql_text || ' SELECT * FROM mgeometry_columns';
+		EXECUTE sql_text ;
+	END IF;		
+	 	sql :=  'select f_mgeometry_segtable_name  from temp_mgeometry_column where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+		EXECUTE sql INTO f_mgeometry_segtable_name;
+	-----------temporal query	
+	session_key := 'temp.intersects.column';
+	BEGIN
+		session_value := current_setting(session_key);
+	EXCEPTION when undefined_object then
+		perform set_config(session_key, '0', false);	     
+		session_value := current_setting(session_key);
+	END;
+	IF (session_value = '0') THEN	
+		perform set_config(session_key, '1', false);
+		tmp_table := 'temp_table';
+		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
+		sql_text := sql_text || ' SELECT DISTINCT mpid FROM ' || f_mgeometry_segtable_name;
+		sql_text := sql_text || ' WHERE timerange && $1;';
+		EXECUTE sql_text USING f_period;
+	END IF;		
+	
+	sql_text := 'SELECT COUNT(*) FROM temp_table WHERE mpid = ' || f_mgeometry.moid;
+	EXECUTE sql_text INTO cnt;	
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;	
+	return false;
+	END;
+$BODY$;
+ALTER FUNCTION public.m_tintersects_materialized(mgeometry, int8range)
+    OWNER TO postgres;	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
@@ -300,172 +370,160 @@ ALTER FUNCTION public.m_tintersects_index(mgeometry, period)
 -----------------------------m_sintersects_index
 		
 
+		
+/*
+	m_sintersects_noindex    basic with no index
+*/
+
+CREATE OR REPLACE FUNCTION public.m_sintersects_noindex(
+	mgeometry,
+	geometry)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	geos				text;
+	res				bool;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	sql := 'select st_astext(st_union(st_makeline(geo::geometry[]))) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid);
+	EXECUTE sql INTO geos; 
+	sql := 'select ' || m_intersects(geos, st_astext(f_geometry));
+	EXECUTE sql INTO res; 
+END;
+$BODY$;
+ALTER FUNCTION public.m_sintersects_noindex(mgeometry, geometry)
+    OWNER TO postgres;	
+	
+/*
+	m_sintersects with index 
+*/	
 
 CREATE OR REPLACE FUNCTION public.m_sintersects_index(
 	mgeometry,
 	geometry)
-    RETURNS boolean
-    LANGUAGE 'plpgsql'
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
     COST 100
-    VOLATILE STRICT PARALLEL UNSAFE
+    VOLATILE STRICT 
 AS $BODY$
 DECLARE
 	f_mgeometry			alias for $1;
 	f_geometry			alias for $2;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	mpid                integer;
-	mbr			geometry;
-	trajid				integer;
-	results				boolean;
-	cnt					integer;
+	res					bool;
+	geos				geometry;
 BEGIN
-
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select  mbr from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into mbr;
-
-	IF (mbr && f_geometry) THEN
-		sql := ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
-		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1);';
-   		EXECUTE sql INTO cnt using f_geometry;
-		IF cnt > 0 THEN
-			RETURN true;
-		ELSE
-			RETURN false;
-		END IF;		
-	END IF;
-	results := false;
-	RETURN results;
+	sql := 'select st_union(st_makeline(geo::geometry[])) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid);
+	EXECUTE sql INTO geos; 
+	sql := 'select ' ||st_intersects(geos,f_geometry);
+	EXECUTE sql INTO res USING f_geometry; 
+	RETURN res;
 END;
 $BODY$;
-
 ALTER FUNCTION public.m_sintersects_index(mgeometry, geometry)
-    OWNER TO postgres;
-		
-		
-	-----------------------------m_intersects_index	
+    OWNER TO postgres;	
 	
-CREATE OR REPLACE FUNCTION public.m_intersects_index(
-	integer,
-	integer)
-    RETURNS boolean
-    LANGUAGE 'plpgsql'
-    COST 100
-    VOLATILE STRICT PARALLEL UNSAFE
-AS $BODY$
-DECLARE
-	f_sid				alias for $1;
-	f_tid				alias for $2;
-	sql					text;
-	cnt					integer;
-BEGIN
-	
-	if(f_sid = f_tid) then
-		return true;
-		END IF;
-	RETURN false;
-END;
-$BODY$;
+/*   
+   m_sintersects_materialized with index into temporal table
+*/
 
-ALTER FUNCTION public.m_intersects_index(integer, integer)
-    OWNER TO postgres;
-
-
-
-
-
-
-CREATE OR REPLACE FUNCTION public.m_tintersects_id(
-	mgeometry,
-	period)
-    RETURNS integer
-    LANGUAGE 'plpgsql'
-    COST 100
-    VOLATILE STRICT PARALLEL UNSAFE
-AS $BODY$
-DECLARE
-	f_mgeometry			alias for $1;
-	f_period			alias for $2;
-	f_mgeometry_segtable_name	char(200);
-	sql					text;
-	mpid                integer;
-	times				int8range;
-	trajid				integer;
-BEGIN
-
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select  timerange from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into times;
-
-	IF (times && (f_period::text)::int8range) THEN
-		RETURN mpid;
-	END IF;
-	return null;
-END;
-$BODY$;
-
-ALTER FUNCTION public.m_tintersects_id(mgeometry, period)
-    OWNER TO postgres;
-
-
-
-
-
-CREATE OR REPLACE FUNCTION public.m_sintersects_id(
+CREATE OR REPLACE FUNCTION public.m_sintersects_materialized(
 	mgeometry,
 	geometry)
-    RETURNS integer
-    LANGUAGE 'plpgsql'
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
     COST 100
-    VOLATILE STRICT PARALLEL UNSAFE
+    VOLATILE STRICT 
 AS $BODY$
 DECLARE
 	f_mgeometry			alias for $1;
 	f_geometry			alias for $2;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	mpid                integer;
-	mbr					geometry;
-	trajid				integer;
+	cnt					integer;
+	meta_key 			text;
+	meta_value			text;
+	sql_text			varchar;
+	table_key			text;
+	session_key 			text;
+	session_value			text;
+	tmp_table			text;
 BEGIN
-
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
-	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-	sql := 'select  mbr from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(mpid);
-   	EXECUTE sql into mbr;
-	IF (mbr && f_geometry) THEN
-	---------------id
-		sql := 'SELECT mpid from ' || (f_mgeometry_segtable_name) || ' mgeo';
-		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' A ND st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1)';
-   		EXECUTE sql into mpid using f_geometry;
-	END IF;
-	RETURN null;
-END;
+	---------------mgeometry table
+	meta_key := 'temp.mgeometry.spatial';
+	BEGIN
+		meta_value := current_setting(meta_key);
+		--RAISE NOTICE 'meta_value :%', meta_value;
+	EXCEPTION when undefined_object then
+		perform set_config(meta_key, '0', false);	     
+		meta_value := current_setting(meta_key);
+	END;	
+	IF (meta_value = '0') THEN	
+		perform set_config(meta_key, '1', false);
+		table_key := 'temp_mgeometry_spatial';
+		sql_text := 'CREATE  temporary TABLE '|| table_key || ' as ';
+		sql_text := sql_text || ' SELECT * FROM mgeometry_columns';
+		EXECUTE sql_text ;
+	END IF;		
+	 	sql :=  'select f_mgeometry_segtable_name  from temp_mgeometry_column where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+		EXECUTE sql INTO f_mgeometry_segtable_name;
+	-----------temporal query	
+	session_key := 'temp.intersects.spatial';
+	BEGIN
+		session_value := current_setting(session_key);
+	EXCEPTION when undefined_object then
+		perform set_config(session_key, '0', false);	     
+		session_value := current_setting(session_key);
+	END;
+	IF (session_value = '0') THEN	
+		perform set_config(session_key, '1', false);
+		tmp_table := 'temp_table_spatial';
+		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
+		sql_text := sql_text || ' SELECT DISTINCT mpid FROM ' || f_mgeometry_segtable_name;
+		sql_text := sql_text || ' WHERE st_intersects(st_makeline(geo::geometry[]),$1);';
+		EXECUTE sql_text USING f_geometry;
+	END IF;		
+	
+	sql_text := 'SELECT COUNT(*) FROM temp_table_spatial WHERE mpid = ' || f_mgeometry.moid;
+	EXECUTE sql_text INTO cnt;	
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;	
+	return false;
+	END;
 $BODY$;
-
-ALTER FUNCTION public.m_sintersects_id(mgeometry, geometry)
-    OWNER TO postgres;
-
+ALTER FUNCTION public.m_sintersects_materialized(mgeometry, geometry)
+    OWNER TO postgres;	
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	--------------------------------------------
+		
+/*
+	m_intersects_noindex    basic with no index
+*/
 
-
-
-CREATE OR REPLACE FUNCTION public.m_sintersects(
+CREATE OR REPLACE FUNCTION public.m_intersects_noindex(
 	mgeometry,
-	geometry,period)
+	geometry, int8range)
 	RETURNS bool
    LANGUAGE 'plpgsql'	
     COST 100
@@ -477,48 +535,127 @@ DECLARE
 	f_period			alias for $3;
 	f_mgeometry_segtable_name	char(200);
 	sql					text;
-	times				bigint[];
-	mpid                integer;
-	mbr			geometry;
-	trajid				integer;
-	results				boolean;
-	cnt					integer;
+	geos				text;
+	res				bool;
 BEGIN
-
-	sql := 'select f_segtableoid from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
-	EXECUTE sql INTO trajid;
-	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where f_segtableoid = ' ||quote_literal(trajid );
+	sql := 'select f_mgeometry_segtable_name  from mgeometry_columns where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
 	EXECUTE sql INTO f_mgeometry_segtable_name;
-	mpid := f_mgeometry.moid;
-
-		sql := ' SELECT COUNT(*) from ' || (f_mgeometry_segtable_name) || ' mgeo';
-		sql := sql || ' where mgeo.mpid = '|| f_mgeometry.moid || ' and st_intersects(ST_MakeLine(mgeo.geo::geometry[]),$1) and m_tintersects($2,$3);';
-   		EXECUTE sql INTO cnt using f_geometry, f_mgeometry, f_period;
-	
-		IF cnt > 0 THEN
-			RETURN true;
-		ELSE
-			RETURN false;
-		END IF;		
-	results := false;
-	RETURN results;
+	sql := 'select st_astext(st_union(st_makeline(geo::geometry[]))) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid) ||
+	' AND  ((lower(timerange) <= lower($1) AND upper(timerange) >= lower($1)) 
+	OR (lower($1) <= lower(timerange) AND upper($1) >= lower(timerange)))';	
+	EXECUTE sql INTO geos USING f_period; 
+	sql := 'select ' || m_intersects(geos, st_astext(f_geometry));
+	EXECUTE sql INTO res; 
 END;
 $BODY$;
-ALTER FUNCTION public.m_sintersects(mgeometry, geometry, period)
-    OWNER TO postgres;		
+ALTER FUNCTION public.m_intersects_noindex(mgeometry, geometry, int8range)
+    OWNER TO postgres;	
 	
+/*
+	m_intersects with index 
+*/	
+
+CREATE OR REPLACE FUNCTION public.m_intersects_index(
+	mgeometry,
+	geometry, int8range)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_period			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnt					integer;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	sql := 'select COUNT(*) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid) ||' AND timerange && $1 AND ST_Intersects(st_makeline(geo::geometry[]), $2);';
+	EXECUTE sql INTO cnt USING f_period, f_geometry; 
+	IF (cnt > 0) then 
+		RETURN true;
+	END IF;
+	RETURN false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_intersects_index(mgeometry, geometry, int8range)
+    OWNER TO postgres;	
 	
+/*   
+   m_intersects_materialized with index into temporal table
+*/
+
+CREATE OR REPLACE FUNCTION public.m_intersects_materialized(
+	mgeometry,
+	geometry, int8range)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_period			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnt					integer;
+	meta_key 			text;
+	meta_value			text;
+	sql_text			varchar;
+	table_key			text;
+	session_key 			text;
+	session_value			text;
+	tmp_table			text;
+BEGIN
+	---------------mgeometry table
+	meta_key := 'temp.mgeometry.st';
+	BEGIN
+		meta_value := current_setting(meta_key);
+		--RAISE NOTICE 'meta_value :%', meta_value;
+	EXCEPTION when undefined_object then
+		perform set_config(meta_key, '0', false);	     
+		meta_value := current_setting(meta_key);
+	END;	
+	IF (meta_value = '0') THEN	
+		perform set_config(meta_key, '1', false);
+		table_key := 'temp_mgeometry_st';
+		sql_text := 'CREATE  temporary TABLE '|| table_key || ' as ';
+		sql_text := sql_text || ' SELECT * FROM mgeometry_columns';
+		EXECUTE sql_text ;
+	END IF;		
+	 	sql :=  'select f_mgeometry_segtable_name  from temp_mgeometry_column where  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+		EXECUTE sql INTO f_mgeometry_segtable_name;
+	-----------temporal query	
+	session_key := 'temp.intersects.st';
+	BEGIN
+		session_value := current_setting(session_key);
+	EXCEPTION when undefined_object then
+		perform set_config(session_key, '0', false);	     
+		session_value := current_setting(session_key);
+	END;
+	IF (session_value = '0') THEN	
+		perform set_config(session_key, '1', false);
+		tmp_table := 'temp_table_st';
+		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
+		sql_text := sql_text || ' SELECT DISTINCT mpid FROM ' || f_mgeometry_segtable_name;
+		sql_text := sql_text || ' WHERE timerange && $1 AND st_intersects(st_makeline(geo::geometry[]),$2);';
+		EXECUTE sql_text USING f_period, f_geometry;
+	END IF;		
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	sql_text := 'SELECT COUNT(*) FROM temp_table_st WHERE mpid = ' || f_mgeometry.moid;
+	EXECUTE sql_text INTO cnt;	
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;	
+	return false;
+	END;
+$BODY$;
+ALTER FUNCTION public.m_intersects_materialized(mgeometry, geometry, int8range)
+    OWNER TO postgres;	
 	
 	
 	

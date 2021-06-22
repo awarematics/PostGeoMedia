@@ -21,6 +21,8 @@ import com.awarematics.postmedia.types.mediamodel.MGeometry;
 import com.awarematics.postmedia.types.mediamodel.MPoint;
 import com.awarematics.postmedia.types.mediamodel.MVideo;
 
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
 import org.postgresql.pljava.annotation.Function;
 
 import static org.postgresql.pljava.annotation.Function.Effects.IMMUTABLE;
@@ -99,6 +101,16 @@ public class SpatialTemporalOP {
 		}	
 		LineString mps = geometryFactory.createLineString(coos);
 		return mps.toText();
+	}
+	
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static String m_sintersects(String geotext, String trajtext)
+			throws ParseException{
+		GeometryFactory geometryFactory = new GeometryFactory();
+		WKTReader reader = new WKTReader(geometryFactory);	  		
+		Geometry geom = (Geometry)reader.read(geotext);
+		Geometry traj = (Geometry)reader.read(trajtext);
+		return geom.intersects(traj);
 	}
 }
 
