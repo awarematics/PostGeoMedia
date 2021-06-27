@@ -14,6 +14,7 @@ import java.util.Date;
 //import org.postgresql.pljava.annotation.Function;
 
 
+
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -32,6 +33,7 @@ public class Insert_BDD_MPoint {
 		ArrayList<String> result =  BddDataToPostgre("D://val/", "mpoint");
 	
 		System.out.println(result.size());
+		/*
 		for (int i = 0; i < result.size(); i++) {
 			Connection c = null;
 		      Statement stmt = null;
@@ -54,7 +56,7 @@ public class Insert_BDD_MPoint {
 		         System.exit(0);
 		      }
 		    // System.out.println("insert 成功！");
-		}
+		}*/
 	}
 
 	// @Function
@@ -95,6 +97,7 @@ public class Insert_BDD_MPoint {
 					coordinate1[j].x = coordinate1_y[j];
 					
 					pointstring = pointstring + "(" + coordinate1_x[j] + "," + coordinate1_y[j] +")\",\"";
+					System.out.println(pointstring);
 				}
 				MGeometryFactory geometryFactory = new MGeometryFactory();				
 				MPoint mp = geometryFactory.createMPoint(coordinate1,timeArray);
@@ -111,7 +114,7 @@ public class Insert_BDD_MPoint {
 				
 				//getMBR
 				String mbr = mp.bbox().toText();
-				String sqlstring = "insert into mpoint_186315 (mpid, segid, mbr, timerange, datetimes, geo) values("+ k +",1,'" + mbr + "'::geometry, '" + int8range + "'::int8range, '" + timestring + "', '"+  pointstring + "')";
+				String sqlstring = "insert into mpoint_230044 (mpid, segid, mbr, timerange, datetimes, geo) values("+ k +",1,'" + mbr + "'::geometry, '" + int8range + "'::int8range, '" + timestring + "', '"+  pointstring + "')";
 				bddString.add(sqlstring);
 				//System.out.println(sqlstring);
 				if(k%1000==0)

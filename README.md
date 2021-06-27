@@ -188,19 +188,64 @@ FROM bdd10k;
 ### Temporal Range Queries
 ```
 
-select carid, mpoint, m_time(mpoint) 
-from bdd10k 
-where m_tintersects(mpoint, '(1494010956999,1504012995999)'::period);
 
----
-select carid, mpoint, m_time(mpoint) 
+-----basic temporal query no index  
+explain analyze
+select carid, mpoint, m_time(mpoint)
 from bdd10k 
-where m_tintersects_index(mpoint, '(1494010956999,1504012995999)'::period);
+where m_tintersects_noindex(mpoint, '(1504010956999,1504012995999)'::int8range)
+and carid <2000;
+
+-----no temporary table with index
+explain analyze
+select carid, mpoint, m_time(mpoint)
+from bdd10k
+where m_tintersects_index(mpoint, '(1504010956999,1504012995999)'::int8range )
+and carid <2000;
+
+
+----- materialized
+explain analyze
+select carid, mpoint, m_time(mpoint)
+from bdd10k 
+where m_tintersects_materialized(mpoint, '(1504010956999,1504012995999)'::int8range)
+and carid <2000;
+
+
+
+
+
 
 ```
 ---Spatial Range Queries
 
 ```
+
+
+-----basic spatial query no index  
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k 
+where m_intersects_noindex(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry,  '(1414010956999,1504012995999)'::int8range)
+and carid <8000;
+
+
+-----no spatial table with index
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k
+where m_intersects_index(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry, '(1414010956999,1504012995999)'::int8range)
+and carid <8000;
+
+
+
+-----spatial table with materialized
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k 
+where m_intersects_materialized(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry, '(1414010956999,1504012995999)'::int8range)
+and carid <8000;
+
 
 
 
@@ -209,21 +254,50 @@ where m_tintersects_index(mpoint, '(1494010956999,1504012995999)'::period);
 ### Spatial-temporal Range Queries
 ```
 
-SELECT *
-FROM car 
-WHERE M_Intersects(mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
-SELECT *
-FROM car a
-WHERE M_Intersects(mpoint,  'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
-SELECT *
-FROM car 
-WHERE M_Intersects_index(mpoint, 'LINESTRING (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
 
-SELECT *
-FROM car 
-WHERE M_Intersects_index(mpoint, 'POLYGON (-1 0, 0 0, 0 0.5, 5 5)', 'Period (1000 2000)'') 
+-----basic spatial query no index  
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k 
+where m_sintersects_noindex(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry)
+and carid <2000;
+
+
+-----no spatial table with index
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k
+where m_sintersects_index(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry)
+and carid <2000;
+
+
+
+-----spatial table with index
+explain analyze
+select carid, mpoint, m_spatial(mpoint)
+from bdd10k 
+where m_sintersects_materialized(mpoint, 'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry)
+and carid <10000;
+
+
+
 
 ```
+### Distance Join Queries (MGeometry to Geometry)
+```
+
+-----basic join query no index  
+
+select carid from bdd100k_seg where m_mindistance_noindex(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
+
+-----join query with index  
+
+select carid from bdd100k_seg where m_mindistance_index(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
+
+----- index with materialized
+
+select carid from bdd100k_seg where m_mindistance_materialized(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
+
 

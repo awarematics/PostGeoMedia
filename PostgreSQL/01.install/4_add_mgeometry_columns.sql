@@ -111,19 +111,18 @@ BEGIN
     	f_mgeometry_segtable_name := 'mpoint_' || f_segtable_oid ;   
    	 	EXECUTE 'ALTER TABLE ' || quote_ident(temp_segtable_name) || ' RENAME TO ' || quote_ident(f_mgeometry_segtable_name);
 		-----index
-		sql := ' create index IF NOT EXISTS bl_index_mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
     	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
     	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
     	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_timerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'imerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
     	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
     	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
     	EXECUTE sql;
-	
 	
 	
     	-- Add record in geometry_columns 
@@ -197,7 +196,7 @@ BEGIN
    		RAISE DEBUG '%', sql;
    		EXECUTE sql;
    	 	temp_segtable_name := 'mvideo_' || table_oid || '_' || f_column_name;
-	
+	RAISE INFO '%', temp_segtable_name;
     	EXECUTE 'CREATE TABLE ' || temp_segtable_name || ' 
         (
             mpid        integer primary key,
@@ -215,37 +214,37 @@ BEGIN
             geo        point[]
         )';
     	sql := 'select '|| quote_literal(temp_segtable_name) ||'::regclass::oid';
-   		RAISE DEBUG '%', sql;
     	EXECUTE sql INTO f_segtable_oid;
-		-----index
-		sql := ' create index IF NOT EXISTS bl_index_mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_timerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_horizontalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (horizontalAngle) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_verticalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (verticalAngle) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_direction2d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction2d) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_direction3d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction3d) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_distance on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (distance) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_uri on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (uri) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
-    	EXECUTE sql;
-		sql := ' create index IF NOT EXISTS bl_index_geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
-    	EXECUTE sql;
-		
-   		-- segment table name
+					-- segment table name
     	f_mgeometry_segtable_name := 'mvideo_' || f_segtable_oid ;   
    	 	EXECUTE 'ALTER TABLE ' || quote_ident(temp_segtable_name) || ' RENAME TO ' || quote_ident(f_mgeometry_segtable_name);
+		-----index
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'mpid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (mpid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'segid on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (segid) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'mbr on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (mbr) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'timerange on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist (timerange) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'horizontalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (horizontalAngle) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'verticalAngle on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (verticalAngle) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'direction2d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction2d) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'direction3d on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (direction3d) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'distance on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (distance) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'uri on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (uri) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'datetimes on '|| quote_ident(f_mgeometry_segtable_name) ||' using btree (datetimes) tablespace pg_default ;';
+    	EXECUTE sql;
+		sql := ' create index IF NOT EXISTS bl_index_'|| (f_segtable_oid) ||'geo on '|| quote_ident(f_mgeometry_segtable_name) ||' using gist(ST_MakeLine(geo::geometry[])) tablespace pg_default ;';
+    	EXECUTE sql;
+		
+   	
 	
     	-- Add record in mgeometry_columns 
     	sql := 'INSERT INTO mgeometry_columns (f_table_catalog, f_table_schema, f_table_name, ' ||
@@ -338,7 +337,7 @@ DECLARE
 
 	sql_text := 'select nextval(' || quote_literal(sequence_name) || ')';
 	execute sql_text into moid;
-	NEW.mvideo = (segtable_oid,moid);		
+	NEW.mvideo = (moid,segtable_oid);		
 	return NEW;
 END
 $BODY$
@@ -393,7 +392,7 @@ DECLARE
 
 	sql_text := 'select nextval(' || quote_literal(sequence_name) || ')';
 	execute sql_text into moid;
-	NEW.mpoint = (segtable_oid,moid);		
+	NEW.mpoint = (moid,segtable_oid);		
 	return NEW;
 END
 $BODY$

@@ -14,6 +14,7 @@ import java.util.Date;
 //import org.postgresql.pljava.annotation.Function;
 
 
+
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -30,9 +31,9 @@ public class Insert_BDD_Cars {
 	public static void main(String args[]) throws IOException,
 			NumberFormatException, ParseException {
 		ArrayList<String> result =  BddDataToPostgre("D://val/", "mpoint");
-	
+		
 		System.out.println(result.size());
-		for (int i = 0; i < result.size(); i++) {
+		
 			Connection c = null;
 		      Statement stmt = null;
 		      try {
@@ -42,7 +43,10 @@ public class Insert_BDD_Cars {
 		            "postgres", "mcalab3408");
 		        // System.out.println("connect 成功！");
 		         stmt = c.createStatement();
-		         String sql = result.get(i);
+		         String sql="";
+		         for (int i = 0; i < result.size(); i++) {
+		         sql = sql + result.get(i);
+		         }
 		         //System.out.println( sql);
 		         stmt.executeUpdate(sql);
 		         stmt.close();
@@ -52,7 +56,7 @@ public class Insert_BDD_Cars {
 		         e.printStackTrace();
 		         System.err.println(e.getClass().getName()+": "+e.getMessage());
 		         System.exit(0);
-		      }
+		    
 		    // System.out.println("insert 成功！");
 		}
 	}
@@ -60,8 +64,8 @@ public class Insert_BDD_Cars {
 	// @Function
 	public static ArrayList<String> BddDataToPostgre(String uris, String type) {
 		ArrayList<String> bddString = new ArrayList<String>();
-		for (int numof = 1; numof <= 9990; numof++) {
-				String sqlstring = "insert into car values(" + numof + ", 'car"+ numof + "', 'car', 'bdd')";
+		for (int numof = 1; numof <= 9920; numof++) {
+				String sqlstring = "insert into bdd100k_seg values(" + numof + ", 'car"+ numof + "', 'car', 'bdd');\r\n";
 				bddString.add(sqlstring);				
 		}
 		return bddString;

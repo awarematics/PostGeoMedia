@@ -30,7 +30,6 @@ import org.locationtech.jts.io.WKTReader;
 
 import com.awarematics.postmedia.io.MWKTReader;
 import com.awarematics.postmedia.mgeom.MGeometryFactory;
-import com.awarematics.postmedia.types.ev.impl.MCoordinateArraySequence;
 
 @SuppressWarnings("unused")
 public class MPoint extends MGeometry {
@@ -139,17 +138,17 @@ public class MPoint extends MGeometry {
 		ArrayList<Long> timesNor = new ArrayList<Long>();
 		for (int i = 0; i < numOf(); i++) {
 			for (long j = now; j < str_end; j += duration) {
-				if (now == 0) {
-					now = times[i] - times[i] % duration;
-				} else if (now >= str_end) {
-					break;
-				} else {
-					now = now + duration;
-				}
-				if (now < str_end && now > str_start) {
+				if (now <= str_end && now >= str_start) {
 					coordsNor.add(snapshot(now).getCoordinate());
 					timesNor.add(now);
 				}
+				if (now == 0) {
+					now = times[i];
+				} else if (now > str_end) {
+					break;
+				} else {
+					now = now + duration;
+				}		
 			}
 		}
 		// notice: the method is not support in java-version 8 version 9 is OK
@@ -340,7 +339,7 @@ public class MPoint extends MGeometry {
 		for (int i = 1; i < numOf(); i++) {
 			value[i] = value[i - 1] + calDistance(coords[i], coords[i - 1]);
 		}
-		System.out.println(distance);
+		//System.out.println(distance);
 		for (int i = 1; i < numOf(); i++) {
 			if (distance >= value[i - 1] && distance < value[i]) {
 				//System.out.println(value[i - 1]);

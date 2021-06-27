@@ -112,6 +112,16 @@ public class SpatialTemporalOP {
 		Geometry traj = (Geometry)reader.read(trajtext);
 		return geom.intersects(traj);
 	}
+	
+	@Function(onNullInput=RETURNS_NULL, effects=IMMUTABLE)
+	public static String m_mindistance(String geotext, String trajtext, double distance)
+			throws ParseException{
+		GeometryFactory geometryFactory = new GeometryFactory();
+		WKTReader reader = new WKTReader(geometryFactory);	  		
+		Geometry geom = (Geometry)reader.read(geotext);
+		Geometry traj = (Geometry)reader.read(trajtext);
+		return geom.intersects(traj);
+	}
 }
 
 

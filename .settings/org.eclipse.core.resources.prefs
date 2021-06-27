@@ -2,5 +2,7 @@ eclipse.preferences.version=1
 encoding//PostgreSQL/01.install/3_functions.sql=UTF-8
 encoding//src/com/awarematics/postmedia/SQLData/Insert_BDD_Cars.java=UTF-8
 encoding//src/com/awarematics/postmedia/SQLData/Insert_BDD_MPoint.java=UTF-8
+encoding//src/com/awarematics/postmedia/SQLData/Insert_BDD_MPoint_rowbyrow.java=UTF-8
+encoding//src/com/awarematics/postmedia/SQLData/Insert_BDD_MPoint_rowbyseg.java=UTF-8
 encoding//src/com/awarematics/postmedia/SQLData/Insert_BDD_MVideo.java=UTF-8
 encoding//src/com/awarematics/postmedia/test/MPoint_Test.java=UTF-8
