@@ -107,8 +107,36 @@ and carid <10000;
 
 
 
-select carid from bdd100k_seg where m_mindistance_materialized(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
 
+explain analyze
+select carid from bdd100k_seg where m_mindistance_noindex(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0) and carid<2000;
+
+-----no spatial table with index
+explain analyze
+select carid from bdd100k_seg where  carid<2000 and m_mindistance_index(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
+---Execution Time: 789.214 ms
+
+
+-----spatial table with index
+explain analyze
+select carid from bdd100k_seg where carid<2000 and  m_mindistance_materialized(mpoint,'POINT (-73.9917157777343 40.7424697420008)'::geometry, 100.0);
+---Execution Time: 476.073 ms
+
+
+
+explain analyze
+select a.carid, b.carid from bdd100k_seg a, bdd100k b where m_mindistance_noindex(a.mpoint, b.mpoint, 100.0) and a.carid<100 and b.carid>9800;
+---Execution Time: 74472.477 ms
+
+
+explain analyze
+select a.carid, b.carid from bdd100k_seg a, bdd100k b where m_mindistance_index(a.mpoint, b.mpoint, 100.0) and a.carid<100 and b.carid>9800;
+
+----Execution Time: 10742.828 ms
+
+explain analyze
+select a.carid, b.carid from bdd100k_seg a, bdd100k b 
+where m_mindistance_materialized(a.mpoint, b.mpoint, 100.0, '[1, 100]','[9800, 10000]') and a.carid<100 and b.carid>9800;
 
 
 

@@ -423,7 +423,7 @@ BEGIN
 	END;
 	IF (session_value = '') THEN	
 		perform set_config(session_key, '1', false);
-		tmp_table := 'temp_table_spatial';
+		tmp_table := 'temp_table_spatial';`
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
 		sql_text := sql_text || ' SELECT DISTINCT mpid FROM ' || f_mgeometry_segtable_name;
 		sql_text := sql_text || ' WHERE st_intersects(st_makeline(geo::geometry[]),$1);';
@@ -717,5 +717,196 @@ ALTER FUNCTION public.m_mindistance_materialized(mgeometry, geometry, double pre
 
 
 	
+	
+
+
+CREATE OR REPLACE FUNCTION public.m_mindistance_noindex(
+	mgeometry,
+	mgeometry, double precision)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry2			alias for $2;
+	f_double			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	f_mgeometry_segtable_name2	char(200);
+	sql					text;
+	geos				geometry;
+	geo2				geometry;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;		
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry2.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name2;		
+	
+	sql := 'select st_union(ST_Collect(geo::geometry[])) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid);	
+	EXECUTE sql INTO geos; 
+	sql := 'select st_union(ST_Collect(geo::geometry[])) from ' || (f_mgeometry_segtable_name2) ||' where mpid = ' ||(f_mgeometry2.moid);	
+	EXECUTE sql INTO geo2; 
+	
+	IF  st_distance(geos::geography, geo2::geography)< f_double THEN
+		RETURN true;
+	END IF;
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_noindex(mgeometry, mgeometry, double precision)
+    OWNER TO postgres;	
+	
+	
+	
+	
+	
+CREATE OR REPLACE FUNCTION public.m_mindistance_index(
+	mgeometry,
+	mgeometry, double precision)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry2			alias for $2;
+	f_double			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	f_mgeometry_segtable_name2	char(200);
+	sql					text;
+	cnn					integer;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;	
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry2.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name2;	
+	
+	sql := 'select count(a.mpid) from ' || (f_mgeometry_segtable_name) ||' a, '|| (f_mgeometry_segtable_name2) ||' b where a.mpid = ' ||(f_mgeometry.moid)|| ' AND b.mpid = ' ||(f_mgeometry2.moid)|| 
+	' AND st_distance( b.mbr::geography, a.mbr::geography)< $1 AND st_distance(ST_Collect(a.geo::geometry[])::geography, ST_Collect(b.geo::geometry[])::geography)< $1';	
+	EXECUTE sql INTO cnn USING f_double; 
+
+	IF cnn >0 THEN
+		RETURN true;
+	END IF;
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_index(mgeometry, mgeometry, double precision)
+    OWNER TO postgres;	
+	
+	
+	
+	
+	
+CREATE OR REPLACE FUNCTION public.m_mindistance_materialized(
+	mgeometry,
+	mgeometry, double precision)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry2			alias for $2;
+	f_double			alias for $3;
+	f_mgeometry_segtable_name	char(200);
+	f_mgeometry_segtable_name2	char(200);
+	sql_text					text;
+	cnt					integer;
+	session_key 			text;
+	session_value			text;
+	tmp_table			text;
+BEGIN
+	f_mgeometry_segtable_name := temp_mgeometry_table(f_mgeometry);	
+	f_mgeometry_segtable_name2 := temp_mgeometry_table(f_mgeometry2);	
+	session_key := 'temp.mindis.st';
+	BEGIN
+		session_value := current_setting(session_key);
+	EXCEPTION when undefined_object then
+		perform set_config(session_key, '', false);	     
+		session_value := current_setting(session_key);
+	END;
+	tmp_table := 'temp_table_mindismm';
+	IF (session_value = '') THEN	
+		perform set_config(session_key, '1', false);
+		----mpid   one   b
+		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
+		sql_text := sql_text || ' SELECT DISTINCT a.mpid as ampid, b.mpid as bmpid FROM ' || f_mgeometry_segtable_name ||' a, '|| (f_mgeometry_segtable_name2) ||' b ';
+		sql_text := sql_text || ' WHERE st_distance( a.mbr::geography, b.mbr::geography)< $1  
+		AND st_distance( ST_Collect(b.geo::geometry[])::geography, ST_Collect(a.geo::geometry[])::geography)< $1;';	
+		EXECUTE sql_text USING f_double; 
+	END IF;		
+	
+	sql_text := 'SELECT COUNT(*) FROM temp_table_mindismm WHERE ampid = ' || f_mgeometry.moid|| ' AND bmpid ='|| f_mgeometry2.moid;
+	EXECUTE sql_text INTO cnt;	
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;	
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_materialized(mgeometry, mgeometry, double precision)
+    OWNER TO postgres;	
+	
+	
+	
+	
+	
+
+CREATE OR REPLACE FUNCTION public.m_mindistance_materialized(
+	mgeometry,
+	mgeometry, double precision, text, text)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_mgeometry2			alias for $2;
+	f_double			alias for $3;
+	f_1			alias for $4;
+	f_2			alias for $5;
+	f_mgeometry_segtable_name	char(200);
+	f_mgeometry_segtable_name2	char(200);
+	sql_text					text;
+	cnt					integer;
+	session_key 			text;
+	session_value			text;
+	tmp_table			text;
+BEGIN
+	f_mgeometry_segtable_name := temp_mgeometry_table(f_mgeometry);	
+	f_mgeometry_segtable_name2 := temp_mgeometry_table(f_mgeometry2);	
+	session_key := 'temp.mindis.st';
+	BEGIN
+		session_value := current_setting(session_key);
+	EXCEPTION when undefined_object then
+		perform set_config(session_key, '', false);	     
+		session_value := current_setting(session_key);
+	END;
+	tmp_table := 'temp_table_mindismm';
+	IF (session_value = '') THEN	
+		perform set_config(session_key, '1', false);
+		----mpid   one   b
+		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
+		sql_text := sql_text || ' SELECT DISTINCT a.mpid as ampid, b.mpid as bmpid FROM ' || f_mgeometry_segtable_name ||' a, '|| (f_mgeometry_segtable_name2) ||' b ';
+		sql_text := sql_text || ' WHERE $2::int4range @> a.mpid AND $3::int4range @> b.mpid AND st_distance( a.mbr::geography, b.mbr::geography)< $1  
+		AND st_distance( ST_Collect(b.geo::geometry[])::geography, ST_Collect(a.geo::geometry[])::geography)< $1;';	
+		EXECUTE sql_text USING f_double, f_1, f_2; 
+	END IF;		
+	raise notice 'sql : %', sql_text;		
+	sql_text := 'SELECT COUNT(*) FROM temp_table_mindismm WHERE ampid = ' || f_mgeometry.moid|| ' AND bmpid ='|| f_mgeometry2.moid;
+	EXECUTE sql_text INTO cnt;	
+		IF cnt > 0 THEN
+			RETURN true;
+		END IF;	
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_materialized(mgeometry, mgeometry, double precision, text, text)
+    OWNER TO postgres;	
 	
 	
