@@ -38,8 +38,8 @@ public class Insert_BDD_MPoint_rowbyseg {
 		//9920
 		
 		for (int i = 0; i < result.size(); i++) {
-			//System.out.println(result.get(i));
-			Connection c = null;
+			System.out.println(result.get(i));
+			/*Connection c = null;
 		      Statement stmt = null;
 		      try {
 		         Class.forName("org.postgresql.Driver");
@@ -59,7 +59,7 @@ public class Insert_BDD_MPoint_rowbyseg {
 		         System.err.println(e.getClass().getName()+": "+e.getMessage());
 		         System.exit(0);
 		      } 
-		    // System.out.println("insert 成功！");
+		    // System.out.println("insert 成功！");*/
 		}
 		
 	}
@@ -71,7 +71,7 @@ public class Insert_BDD_MPoint_rowbyseg {
 		ArrayList<String> bddString = new ArrayList<String>();
 		int k=0;
 
-		for (int numof = 1; numof <= 10000; numof++) {
+		for (int numof = 1; numof <= 10; numof++) {
 			long[] timeArray;
 			String timestring = "";
 			String pointstring = "{\"";

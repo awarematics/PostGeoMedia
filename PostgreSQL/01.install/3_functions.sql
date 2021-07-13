@@ -224,10 +224,10 @@ BEGIN
 	BEGIN
 		meta_value := current_setting(meta_key);
 	EXCEPTION when undefined_object then
-		perform set_config(meta_key, '', false);	     
+		perform set_config(meta_key, '0', false);	     
 		meta_value := current_setting(meta_key);
 	END;	
-	IF (meta_value = '') THEN	
+	IF (meta_value = '0') THEN	
 		perform set_config(meta_key, '1', false);
 		table_key := 'temp_mgeometry_column';
 		sql_text := 'CREATE  temporary TABLE '|| table_key || ' as ';
@@ -268,10 +268,10 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		tmp_table := 'temp_table';
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
@@ -418,10 +418,10 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		tmp_table := 'temp_table_spatial';`
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
@@ -564,10 +564,10 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		tmp_table := 'temp_table_st';
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
@@ -689,11 +689,11 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
 	tmp_table := 'temp_table_mindis';
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
 		sql_text := sql_text || ' SELECT DISTINCT mpid FROM ' || f_mgeometry_segtable_name;
@@ -826,11 +826,11 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
 	tmp_table := 'temp_table_mindismm';
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		----mpid   one   b
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
@@ -884,11 +884,11 @@ BEGIN
 	BEGIN
 		session_value := current_setting(session_key);
 	EXCEPTION when undefined_object then
-		perform set_config(session_key, '', false);	     
+		perform set_config(session_key, '0', false);	     
 		session_value := current_setting(session_key);
 	END;
 	tmp_table := 'temp_table_mindismm';
-	IF (session_value = '') THEN	
+	IF (session_value = '0') THEN	
 		perform set_config(session_key, '1', false);
 		----mpid   one   b
 		sql_text := 'CREATE temporary TABLE ' ||tmp_table|| ' as ';
@@ -908,5 +908,79 @@ END;
 $BODY$;
 ALTER FUNCTION public.m_mindistance_materialized(mgeometry, mgeometry, double precision, text, text)
     OWNER TO postgres;	
+	
+
+	
+	
+
+CREATE OR REPLACE FUNCTION public.m_mindistance_index(
+	mgeometry,
+	geometry, double precision, int8range)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_double			alias for $3;
+	f_range				alias for $4;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnn					integer;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;		
+	
+	sql := 'select count(mpid) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid)|| 
+	' AND timerange && $1 AND st_distance($2::geography, mbr::geography)< $3 AND st_distance($2::geography, ST_Collect(geo::geometry[])::geography)< $3';	
+	EXECUTE sql INTO cnn USING f_range, f_geometry, f_double; --30m
+
+	IF cnn >0 THEN
+		RETURN true;
+	END IF;
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_index(mgeometry, geometry, double precision, int8range)
+    OWNER TO postgres;	
+	
+
+
+CREATE OR REPLACE FUNCTION public.m_mindistance_index(
+	mgeometry,
+	geometry, double precision, bigint)
+	RETURNS bool
+   LANGUAGE 'plpgsql'	
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $1;
+	f_geometry			alias for $2;
+	f_double			alias for $3;
+	f_range				alias for $4;
+	f_mgeometry_segtable_name	char(200);
+	sql					text;
+	cnn					integer;
+BEGIN
+	sql := 'select f_mgeometry_segtable_name from mgeometry_columns where f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO f_mgeometry_segtable_name;		
+	
+	sql := 'select count(mpid) from ' || (f_mgeometry_segtable_name) ||' where mpid = ' ||(f_mgeometry.moid)|| 
+	' AND timerange @> $1 AND st_distance($2::geography, mbr::geography)< $3 AND st_distance($2::geography, ST_Collect(geo::geometry[])::geography)< $3';	
+	EXECUTE sql INTO cnn USING f_range, f_geometry, f_double; --30m
+
+	IF cnn >0 THEN
+		RETURN true;
+	END IF;
+	return false;
+END;
+$BODY$;
+ALTER FUNCTION public.m_mindistance_index(mgeometry, geometry, double precision, bigint)
+    OWNER TO postgres;	
+	
+	
 	
 	
