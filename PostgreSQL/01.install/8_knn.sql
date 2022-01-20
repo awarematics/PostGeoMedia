@@ -32,6 +32,24 @@ CREATE AGGREGATE m_knn_distance(mpoint,mpoint,integer)
   INITCOND = '{}'
 );
 
+CREATE AGGREGATE m_knn(mpoint,text,integer)
+(
+  SFUNC = m_knn1,
+  STYPE = text[],	 
+  FINALFUNC = results,
+  INITCOND = '{}'
+);
+DROP AGGREGATE m_knn(mpoint,text,integer)
+
+CREATE AGGREGATE m_knn_distance(mpoint,text,integer)
+(
+  SFUNC = m_knn1_distance,
+  STYPE = text[],	 
+  FINALFUNC = results,
+  INITCOND = '{}'
+);
+DROP AGGREGATE m_knn_distance(mpoint,text,integer)
+
 ----- AGGREGATE SFUNC FUNCTIONs -----
 
 CREATE OR REPLACE FUNCTION public.m_knn1(
@@ -225,6 +243,92 @@ $BODY$;
 ALTER FUNCTION public.m_knn1_distance(text[],mpoint, mpoint,integer)
     OWNER TO postgres;
 
+CREATE OR REPLACE FUNCTION public.m_knn1(
+	text[],
+	mpoint,
+	text,
+	integer)
+    RETURNS  text[]
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $2;
+	f_text			alias for $3;
+	f_k					alias for $4;
+	agg					alias for $1;
+	ff_text				geometry;
+	f_mgeometry_segtable_name	char(200);
+	results				text;
+	sql					text;
+	cnt				    integer;
+	trajid				integer;
+	mpid                integer;
+BEGIN
+	
+	sql := 'SELECT f_segtableoid  FROM mgeometry_columns WHERE  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'SELECT f_mgeometry_segtable_name  FROM mgeometry_columns WHERE f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	raise notice '%',f_text;
+	IF (f_mgeometry.moid > 1 ) THEN
+		RETURN agg;
+	END IF;
+	sql := 'WITH results AS(SELECT  mp.segid as segid, ST_GeomFromText($1,4326) <-> mp.trajectory  as min FROM ' || (f_mgeometry_segtable_name) ||' mp  '|| ' ORDER BY min LIMIT '||(f_k) ||') SELECT '||quote_literal('{') ||' || array_agg(segid)::text  ||'
+         	       || quote_literal('}') ||' FROM results';
+	EXECUTE sql INTO results USING f_text ;	
+	raise notice '%',results;
+	RETURN array_append(agg,results);
+
+END
+$BODY$;
+ALTER FUNCTION public.m_knn1(text[],mpoint, text,integer)
+    OWNER TO postgres;
+	
+CREATE OR REPLACE FUNCTION public.m_knn1_distance(
+	text[],
+	mpoint,
+	text,
+	integer)
+    RETURNS  text[]
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE STRICT 
+AS $BODY$
+DECLARE
+	f_mgeometry			alias for $2;
+	f_text			alias for $3;
+	f_k					alias for $4;
+	agg					alias for $1;
+	ff_text				geometry;
+	f_mgeometry_segtable_name	char(200);
+	results				text;
+	sql					text;
+	cnt				    integer;
+	trajid				integer;
+	mpid                integer;
+BEGIN
+	
+	sql := 'SELECT f_segtableoid  FROM mgeometry_columns WHERE  f_segtableoid = ' ||quote_literal(f_mgeometry.segid);
+	EXECUTE sql INTO trajid;
+	sql := 'SELECT f_mgeometry_segtable_name  FROM mgeometry_columns WHERE f_segtableoid = ' ||quote_literal(trajid );
+	EXECUTE sql INTO f_mgeometry_segtable_name;
+	raise notice '%',f_text;
+	IF (f_mgeometry.moid > 1 ) THEN
+		RETURN agg;
+	END IF;
+	sql := 'WITH results AS(SELECT  mp.segid as segid, ST_GeomFromText($1,4326) <-> mp.trajectory  as min FROM ' || (f_mgeometry_segtable_name) ||' mp  '|| ' ORDER BY min LIMIT '||(f_k) ||')SELECT '||quote_literal('{') ||' || array_agg(segid)::text  ||'
+         	 || quote_literal(',')|| '||  array_agg(min)::text ||'|| quote_literal('}') ||' FROM results';	
+	EXECUTE sql INTO results USING f_text ;	
+	raise notice '%',results;
+	RETURN array_append(agg,results);
+
+END
+$BODY$;
+ALTER FUNCTION public.m_knn1_distance(text[],mpoint, text,integer)
+    OWNER TO postgres;
+
 ----- AGGREGATE FINALFUNC FUNCTION -----
 
 CREATE OR REPLACE FUNCTION results(aa text[])
@@ -257,3 +361,15 @@ FROM trips t,querypoint p
 
 SELECT unnest(m_knn_distance(t1.mt , t2.mt, 3))
 FROM trips t1,trips t2
+
+SELECT m_knn(t.mt,'LINESTRING(0 0, 1 1)',3)
+FROM Trips t
+
+SELECT m_knn_distance(t.mt,'LINESTRING(0 0, 1 1)',3)
+FROM Trips t
+
+SELECT m_knn(t.mt,'POLYGON((75 29, 77 29, 77 29, 75 29))',3)
+FROM Trips t
+
+SELECT m_knn_distance(t.mt,'POLYGON((75 29, 77 29, 77 29, 75 29))',3)
+FROM Trips t
