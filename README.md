@@ -285,11 +285,11 @@ and carid <10000;
 ```
 ### K Nearest Neighbor Query
 ```
-select m_knn(t.mpoint,'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry,3)
-from Trip t
+SELECT m_knn(t.mpoint,'LINESTRING(40 -73,40.7416693959765 -73.9897693321798,40.7416693959765 -73.9897693321798)'::geometry,3)
+FROM Trip t
 
-select m_knn(t.mpoint,p.geo,3)
-from Trip t,POI p
+SELECT m_knn(t.mpoint,p.geo,3)
+FROM Trip t,POI p
 
 SELECT m_knn(t1.traj,t2.traj,3)
 FROM Trip t1,Trip t2
