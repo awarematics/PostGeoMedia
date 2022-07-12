@@ -46,12 +46,12 @@
 	driver varchar
 );
 
-```
-
 select addmgeometrycolumn('public', 'bdd10k', 'mpoint', 4326, 'mpoint', 2, 50);
 select addmgeometrycolumn('public', 'bdd10k', 'mvideo', 4326, 'mvideo', 2, 50);
 
 select * from bdd10k;
+
+```
 
 
 ### Insert Examples 
